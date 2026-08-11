@@ -54,3 +54,10 @@ echo ""
 echo "DMG ready:"
 echo "  ${DMG_PATH}"
 ls -lh "${DMG_PATH}"
+
+# Keep /Applications in sync so Desktop shortcuts launch this build.
+# Replaces the .app only — never touches Application Support / credentials / DB.
+if [[ "${BOOKMARKX_SKIP_APP_INSTALL:-}" != "1" ]]; then
+  echo ""
+  "${ROOT}/Scripts/install-to-applications.sh" "${PRODUCT}"
+fi

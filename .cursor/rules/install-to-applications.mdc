@@ -1,0 +1,32 @@
+---
+description: After every BookmarkX release, install the new .app into /Applications without touching user data.
+alwaysApply: true
+---
+
+# Install releases into /Applications
+
+Whenever you ship a new BookmarkX version (commit + DMG + GitHub Release), also update the local installed app so the Desktop shortcut keeps launching the latest build.
+
+## Required steps (every release)
+
+1. Build/package as usual (`./Scripts/package-dmg.sh <version>` or equivalent Release build).
+2. Install into Applications with **replace app only**:
+
+```bash
+./Scripts/install-to-applications.sh
+# or explicitly:
+./Scripts/install-to-applications.sh /path/to/BookmarkX.app
+```
+
+3. Confirm `/Applications/BookmarkX.app` reports the new `CFBundleShortVersionString`.
+
+## Hard rules
+
+- **Do** replace `/Applications/BookmarkX.app` (and recreate the Desktop alias if it is broken).
+- **Do not** delete, reset, or migrate anything under Application Support, Keychain-adjacent credential stores used by the app, or the local SQLite database.
+- **Do not** clear login sessions, bookmarks, folders, or settings as part of install/upgrade.
+- Prefer `ditto` / the install script over dragging from DMG when automating; quit BookmarkX first if it is running, then copy.
+
+## Why
+
+The Desktop shortcut points at `/Applications/BookmarkX.app`. Shipping only a GitHub DMG leaves the installed app stale, so the shortcut opens an old version.
