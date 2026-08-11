@@ -17,7 +17,7 @@ X 内置的书签只是一个扁平列表：不能搜索、不能分类、不能
 - **毫秒级全文搜索**：基于 SQLite FTS5，支持中英日等多语言，按作者 / 日期 / 媒体类型 / 标签组合筛选
 - **多格式导出**：Markdown（兼容 Obsidian）/ CSV / JSON
 - **多语言界面**：简体中文、English（持续扩展）
-- **集成登录**：X 账号授权 + Grok（xAI）模型接入，凭证存储于 macOS Keychain
+- **集成登录**：支持 X Premium Grok 额度、xAI API Key，以及自动优先 Premium / 回退 API Key；凭证存入 macOS Keychain
 
 ## 技术栈
 
@@ -25,7 +25,7 @@ X 内置的书签只是一个扁平列表：不能搜索、不能分类、不能
 | --- | --- |
 | 应用框架 | Swift + SwiftUI（macOS 14+） |
 | 数据库 | SQLite（GRDB.swift）+ FTS5 全文索引 |
-| AI 模型 | xAI Grok API |
+| AI 模型 | Grok：X Premium 额度 / xAI API Key / 自动 |
 | X 数据 | X API v2（OAuth 2.0 PKCE） |
 | 凭证存储 | macOS Keychain |
 
@@ -33,25 +33,47 @@ X 内置的书签只是一个扁平列表：不能搜索、不能分类、不能
 
 🚧 **开发中（v1.0 尚未发布）**
 
-- [ ] M1：项目骨架、数据库 Schema、X 登录与书签同步
-- [ ] M2：书签列表 / 详情 / 搜索 / 文件夹与标签管理
-- [ ] M3：Grok 集成：自动分类、摘要、打标
-- [ ] M4：导出、多语言、设置页、发布 v1.0
+- [x] M1 骨架：SwiftUI App、SQLite/GRDB Schema、FTS5、Keychain、中英文本地化、基础界面
+- [ ] M1 后续：X OAuth 登录与书签同步
+- [ ] M2：书签列表增强 / 详情编辑 / 拖拽整理
+- [ ] M3：Grok 自动分类、摘要、打标
+- [ ] M4：导出、打磨与发布 v1.0
 
 详细规划见 [PRD.md](./PRD.md)。
 
 ## 快速开始（开发者）
 
+要求：macOS 14+、Xcode 16+、[XcodeGen](https://github.com/yonaskolb/XcodeGen)
+
 ```bash
 git clone https://github.com/williamyangcn/BookmarkX.git
 cd BookmarkX
-# Xcode 项目搭建中，敬请期待
+./Scripts/generate.sh
+open BookmarkX.xcodeproj
+```
+
+如果本机 `xcode-select` 仍指向 Command Line Tools，可临时：
+
+```bash
+export DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer
+```
+
+运行测试：
+
+```bash
+export DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer
+xcodebuild -scheme BookmarkX -destination 'platform=macOS' test
 ```
 
 运行前你需要准备：
 
-1. **X API 凭证**：在 [X Developer Portal](https://developer.x.com/) 创建应用，获取 OAuth 2.0 Client ID
-2. **Grok API Key**：在 [xAI Console](https://console.x.ai/) 创建 API Key（支持用 X 账号登录）
+1. **X API 凭证**：在 [X Developer Portal](https://developer.x.com/) 创建 OAuth 2.0 Native App，权限选择 Read，启用 `tweet.read users.read bookmark.read offline.access`，回调地址填写 `bookmarkx://oauth/x/callback`，然后把 Client ID 填入 App 设置页
+2. **Grok（三选一）**：
+   - **X Premium Grok**：连接 X 后使用会员自带额度
+   - **xAI API Key**：在 [xAI Console](https://console.x.ai/) 创建 Key（单独计费）
+   - **自动**：优先 Premium，失败则回退 API Key
+
+X 与 Grok 凭证均存入 macOS Keychain。设置页可一键测试 Grok。可用工具栏「添加示例」验证本地数据库与界面。
 
 ## 隐私
 
