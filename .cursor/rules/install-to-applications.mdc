@@ -20,12 +20,20 @@ Whenever you ship a new BookmarkX version (commit + DMG + GitHub Release), also 
 
 3. Confirm `/Applications/BookmarkX.app` reports the new `CFBundleShortVersionString`.
 
-## Hard rules
+## Hard rules — data safety
 
 - **Do** replace `/Applications/BookmarkX.app` (and recreate the Desktop alias if it is broken).
-- **Do not** delete, reset, or migrate anything under Application Support, Keychain-adjacent credential stores used by the app, or the local SQLite database.
-- **Do not** clear login sessions, bookmarks, folders, or settings as part of install/upgrade.
-- Prefer `ditto` / the install script over dragging from DMG when automating; quit BookmarkX first if it is running, then copy.
+- **Do not** delete, reset, move, merge, rewrite, or “clean up” anything under:
+  - `~/Library/Containers/com.williamyang.BookmarkX/` (sandboxed app data — **this is what Applications uses**)
+  - `~/Library/Application Support/BookmarkX/` (legacy / non-sandbox copy — may still hold recent edits)
+  - credentials / login session / SQLite / folders / bookmarks / settings
+- **Do not** run SQL against the live DB as part of install/upgrade unless the user explicitly asks to repair/restore data.
+- Prefer `ditto` / the install script over dragging from DMG when automating; quit BookmarkX first if it is running, then copy **only** the `.app` bundle.
+- Never call `pruneEmptyFolders` (or any folder wipe / full reclassify) as a side effect of installing or launching after upgrade.
+
+## Why two data locations exist
+
+Sandboxed `/Applications/BookmarkX.app` stores data in the **container** path. Some Debug / older runs may write to `~/Library/Application Support/BookmarkX/`. Replacing the `.app` does not delete either store, but launching Applications after install shows the container DB — folders created in the legacy store can look “lost”. Treat both paths as user data; do not erase either.
 
 ## Why
 

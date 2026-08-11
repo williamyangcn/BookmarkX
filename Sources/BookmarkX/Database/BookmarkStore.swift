@@ -130,6 +130,7 @@ final class BookmarkStore {
     }
 
     /// Drop folders that no longer contain any non-deleted bookmarks.
+    /// Only call from an explicit user action — never during upgrade / reclassify.
     func pruneEmptyFolders() async throws {
         try await database.dbWriter.write { db in
             try db.execute(

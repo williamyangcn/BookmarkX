@@ -5,6 +5,8 @@ import Foundation
 actor XWebBookmarksClient {
     private let session: URLSession
     private var cachedQueryIDs: [String: String] = [:]
+    /// Once an operation works, keep using it for the rest of the process lifetime.
+    private var preferredOperationName: String?
 
     init(session: URLSession = .shared) {
         self.session = session
@@ -18,8 +20,17 @@ actor XWebBookmarksClient {
         let clamped = min(max(count, 1), 100)
         let ids = try await resolveQueryIDs(webSession: webSession)
 
+        var candidates = Self.operationCandidates(from: ids)
+        if let preferredOperationName {
+            candidates.sort { lhs, rhs in
+                let l = lhs.name == preferredOperationName ? 0 : 1
+                let r = rhs.name == preferredOperationName ? 0 : 1
+                return l < r
+            }
+        }
+
         var lastError: Error?
-        for candidate in Self.operationCandidates(from: ids) {
+        for candidate in candidates {
             do {
                 let page = try await fetch(
                     webSession: webSession,
@@ -28,9 +39,11 @@ actor XWebBookmarksClient {
                     cursor: cursor
                 )
                 // Empty first page from a stale op — try the next candidate.
-                if page.tweets.isEmpty, cursor == nil, candidate.name != "Bookmarks" {
+                if page.tweets.isEmpty, cursor == nil {
+                    lastError = XWebSessionError.invalidResponse
                     continue
                 }
+                preferredOperationName = candidate.name
                 return page
             } catch {
                 lastError = error
@@ -173,17 +186,25 @@ actor XWebBookmarksClient {
             return disk
         }
 
-        let discovered = await discoverQueryIDs(webSession: webSession)
-        if !discovered.isEmpty {
-            cachedQueryIDs = discovered
-            saveCachedQueryIDs(discovered)
-            return discovered
-        }
-
+        // Start sync immediately with known fallbacks — JS discovery can take minutes.
         var fallback: [String: String] = [:]
         for item in Self.fallbackBookmarks where fallback[item.name] == nil {
             fallback[item.name] = item.id
         }
+        fallback["DeleteBookmark"] = Self.fallbackDeleteQueryID
+        cachedQueryIDs = fallback
+
+        Task { [webSession] in
+            let discovered = await self.discoverQueryIDs(webSession: webSession)
+            guard !discovered.isEmpty else { return }
+            var merged = fallback
+            for (key, value) in discovered {
+                merged[key] = value
+            }
+            self.cachedQueryIDs = merged
+            self.saveCachedQueryIDs(merged)
+        }
+
         return fallback
     }
 

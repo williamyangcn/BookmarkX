@@ -108,8 +108,9 @@ final class AppSettings {
             newestFirst: true,
             skipAlreadySynced: syncSkipAlreadySynced,
             deleteFromXAfterSync: syncDeleteFromXAfterSync,
-            backfillComplete: syncBackfillComplete,
-            backfillCursor: syncBackfillCursor
+            deepBackfill: false,
+            backfillCursor: syncBackfillCursor,
+            backfillComplete: syncBackfillComplete
         )
     }
 

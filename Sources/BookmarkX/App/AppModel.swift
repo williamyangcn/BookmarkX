@@ -91,7 +91,19 @@ final class AppModel {
 
         isSyncing = true
         syncStatusMessage = AppLocalization.text("sync.status.running")
-        defer { isSyncing = false }
+        defer {
+            isSyncing = false
+            syncService.onProgress = nil
+        }
+
+        syncService.onProgress = { [weak self] page, result in
+            self?.syncStatusMessage = AppLocalization.format(
+                "sync.status.progressFormat",
+                page,
+                result.imported + result.restored,
+                result.skipped
+            )
+        }
 
         do {
             let result = try await syncService.sync(options: settings.syncOptions)
@@ -102,15 +114,21 @@ final class AppModel {
                 result.restored,
                 result.skipped,
                 settings.syncBatchSize)
-            // Enrichment can take minutes with Grok; don't block the sync spinner.
-            Task { await enrichPendingBookmarks() }
+
+            // Folder/title assignment must happen right after sync — local classifier is fast.
+            // Await so the list shows folders before we clear the sync spinner.
+            let gained = result.imported + result.restored
+            if gained > 0 {
+                await enrichPendingBookmarks(forceLocal: true)
+            } else {
+                Task { await enrichPendingBookmarks(forceLocal: true) }
+            }
         } catch {
             syncStatusMessage = error.localizedDescription
         }
     }
 
     private func applySyncProgress(from result: BookmarkSyncResult) {
-        // Drop legacy watermark — catch-up now uses consecutive local skips.
         settings.syncNewestWatermark = nil
         if result.reachedEndOfRemoteList {
             settings.syncBackfillComplete = true
@@ -124,8 +142,8 @@ final class AppModel {
 
     /// Generates title, summary, category folder, and tags for all unprocessed
     /// active synced bookmarks. Existing rows are picked up once by `processed_at`.
-    /// Always allowed: falls back to the local classifier when Grok is unavailable.
-    func enrichPendingBookmarks() async {
+    /// - Parameter forceLocal: Prefer the local classifier so folders appear immediately.
+    func enrichPendingBookmarks(forceLocal: Bool = false) async {
         guard !isEnriching else { return }
         guard let bookmarkStore else { return }
 
@@ -133,10 +151,13 @@ final class AppModel {
         defer { isEnriching = false }
 
         do {
-            await configureGrokClient()
+            if !forceLocal {
+                await configureGrokClient()
+            }
             let items = try await bookmarkStore.pendingEnrichmentItems()
             guard !items.isEmpty else { return }
-            await runEnrichment(items: items, forceLocal: !connectionStatus.isGrokConfigured)
+            let useLocal = forceLocal || !connectionStatus.isGrokConfigured
+            await runEnrichment(items: items, forceLocal: useLocal)
         } catch {
             syncStatusMessage = error.localizedDescription
         }
@@ -158,7 +179,7 @@ final class AppModel {
                 return
             }
             await runEnrichment(items: items, forceLocal: true)
-            try await bookmarkStore.pruneEmptyFolders()
+            // Do not auto-delete empty folders — user-created folders must survive upgrades.
             try await bookmarkStore.reload(searchText: searchText)
             settings.folderTaxonomyVersion = AppSettings.currentFolderTaxonomyVersion
         } catch {

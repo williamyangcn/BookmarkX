@@ -42,13 +42,13 @@ final class BookmarkSyncMathTests: XCTestCase {
         XCTAssertFalse(
             BookmarkSyncMath.shouldStopCatchUp(
                 skipAlreadySynced: true,
-                consecutiveSkips: 14
+                consecutiveSkips: 7
             )
         )
         XCTAssertTrue(
             BookmarkSyncMath.shouldStopCatchUp(
                 skipAlreadySynced: true,
-                consecutiveSkips: 15
+                consecutiveSkips: 8
             )
         )
         XCTAssertFalse(
