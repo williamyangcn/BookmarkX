@@ -1,87 +1,163 @@
 # BookmarkX
 
-> 本地优先的 X（Twitter）书签管理 macOS 应用 —— 用 Grok 把你的书签变成个人知识库。
->
-> A local-first macOS app that turns your X (Twitter) bookmarks into a personal knowledge base, powered by Grok.
+[English](#english) · [中文](#中文)
 
-## 为什么做 BookmarkX
+Local-first macOS app for X (Twitter) bookmarks — sync, organize, search, and summarize with Grok.
 
-X 内置的书签只是一个扁平列表：不能搜索、不能分类、不能导出，推文删了收藏就没了。BookmarkX 把你的书签全量同步到本地 SQLite 数据库，用 Grok 模型自动分类、生成摘要、打标签，让收藏真正可检索、可整理、可沉淀。
+本地优先的 X（Twitter）书签管理 macOS 应用：同步、整理、搜索，并用 Grok 自动摘要与分类。
 
-## 核心特性
+<p>
+  <a href="https://github.com/williamyangcn/BookmarkX/releases/latest">
+    <img alt="Download DMG" src="https://img.shields.io/badge/Download-DMG-0A84FF?style=for-the-badge&logo=apple&logoColor=white" />
+  </a>
+  &nbsp;
+  <a href="https://github.com/williamyangcn/BookmarkX/releases">
+    <img alt="GitHub Releases" src="https://img.shields.io/github/v/release/williamyangcn/BookmarkX?style=for-the-badge&label=Releases" />
+  </a>
+  &nbsp;
+  <a href="./LICENSE">
+    <img alt="MIT License" src="https://img.shields.io/badge/License-MIT-green?style=for-the-badge" />
+  </a>
+</p>
 
-- **书签全量备份**：一键把 X 书签同步到本地，增量更新，推文被删也不丢失
-- **Grok 智能整理**：自动分类、自动生成内容摘要、自动打标签，结果均可人工编辑
-- **本地优先**：数据只存在你 Mac 上的 SQLite 数据库中，不上云、无追踪
-- **组织自由**：无限层级文件夹、拖拽移动、彩色标签、批量操作、个人备注
-- **毫秒级全文搜索**：基于 SQLite FTS5，支持中英日等多语言，按作者 / 日期 / 媒体类型 / 标签组合筛选
-- **多格式导出**：Markdown（兼容 Obsidian）/ CSV / JSON
-- **多语言界面**：简体中文、English（持续扩展）
-- **集成登录**：支持 X Premium Grok 额度、xAI API Key，以及自动优先 Premium / 回退 API Key；凭证存入 macOS Keychain
+---
 
-## 技术栈
+## English
 
-| 组件 | 选型 |
+### Download
+
+**macOS 14+ (Apple Silicon / Intel)**
+
+| Package | Link |
 | --- | --- |
-| 应用框架 | Swift + SwiftUI（macOS 14+） |
-| 数据库 | SQLite（GRDB.swift）+ FTS5 全文索引 |
-| AI 模型 | Grok：X Premium 额度 / xAI API Key / 自动 |
-| X 数据 | X API v2（OAuth 2.0 PKCE） |
-| 凭证存储 | macOS Keychain |
+| **Latest DMG** | [Download from GitHub Releases](https://github.com/williamyangcn/BookmarkX/releases/latest) |
+| All versions | [Releases page](https://github.com/williamyangcn/BookmarkX/releases) |
 
-## 项目状态
+1. Open the `.dmg` and drag **BookmarkX** into **Applications**.
+2. On first launch, macOS may ask you to allow an unsigned/ad-hoc build: **System Settings → Privacy & Security → Open Anyway**.
+3. Sign in with X inside the app, then click **Refresh** to sync bookmarks.
 
-🚧 **开发中（v1.0 尚未发布）**
+> If the latest release has no DMG asset yet, build one locally with `./Scripts/package-dmg.sh` (see below), or wait for the next published release.
 
-- [x] M1 骨架：SwiftUI App、SQLite/GRDB Schema、FTS5、Keychain、中英文本地化、基础界面
-- [ ] M1 后续：X OAuth 登录与书签同步
-- [ ] M2：书签列表增强 / 详情编辑 / 拖拽整理
-- [ ] M3：Grok 自动分类、摘要、打标
-- [ ] M4：导出、打磨与发布 v1.0
+### What it does
 
-详细规划见 [PRD.md](./PRD.md)。
+- Sync X bookmarks to a local SQLite database (IMAP-style: skip already synced, fetch up to 100 new ones per refresh)
+- Four-column layout: shortcuts · folders · list · X post preview
+- Unread workflow: read after 30s (font thins, count updates); next time you open Unread, read items move to Archive
+- Group list by post time: Today / Yesterday / 7 days / 15 days / 1 month / This year / Last year…
+- Importance, favorites, archive, delete (local or local + X)
+- Grok enrichment: title, summary, category folder, tags (Premium quota, API key, or Auto)
+- Full-text search (FTS5)
+- UI languages: English and Simplified Chinese
 
-## 快速开始（开发者）
+### Requirements
 
-要求：macOS 14+、Xcode 16+、[XcodeGen](https://github.com/yonaskolb/XcodeGen)
+- macOS 14 Sonoma or later
+- An X account (in-app web login; no Developer Client ID required for the default path)
+- Optional: X Premium for Grok quota, or an [xAI API Key](https://console.x.ai/)
+
+### Build from source
 
 ```bash
 git clone https://github.com/williamyangcn/BookmarkX.git
 cd BookmarkX
-./Scripts/generate.sh
+./Scripts/generate.sh          # needs XcodeGen
 open BookmarkX.xcodeproj
 ```
-
-如果本机 `xcode-select` 仍指向 Command Line Tools，可临时：
-
-```bash
-export DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer
-```
-
-运行测试：
 
 ```bash
 export DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer
 xcodebuild -scheme BookmarkX -destination 'platform=macOS' test
 ```
 
-运行前你需要准备：
+### Package a DMG
 
-1. **X API 凭证**：在 [X Developer Portal](https://developer.x.com/) 创建 OAuth 2.0 Native App，权限选择 Read，启用 `tweet.read users.read bookmark.read offline.access`，回调地址填写 `bookmarkx://oauth/x/callback`，然后把 Client ID 填入 App 设置页
-2. **Grok（三选一）**：
-   - **X Premium Grok**：连接 X 后使用会员自带额度
-   - **xAI API Key**：在 [xAI Console](https://console.x.ai/) 创建 Key（单独计费）
-   - **自动**：优先 Premium，失败则回退 API Key
+```bash
+export DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer
+./Scripts/package-dmg.sh          # → dist/BookmarkX-<version>.dmg
+./Scripts/package-dmg.sh 0.1.0    # optional version tag
+```
 
-X 与 Grok 凭证均存入 macOS Keychain。设置页可一键测试 Grok。可用工具栏「添加示例」验证本地数据库与界面。
+Upload the DMG on [GitHub Releases](https://github.com/williamyangcn/BookmarkX/releases/new) so the Download badge above points at a real file.
 
-## 隐私
+### Privacy
 
-- 所有书签数据仅存储在本地
-- 网络请求仅用于：X 书签同步、Grok API 调用
-- 无任何统计或追踪 SDK
-- 数据随时可导出、可删除
+- Bookmarks stay on your Mac (SQLite)
+- Network use is limited to X sync / login and Grok calls
+- No analytics SDK
+- You can delete local data anytime
 
-## License
+### License
+
+[MIT](./LICENSE)
+
+---
+
+## 中文
+
+### 下载
+
+**macOS 14+（Apple Silicon / Intel）**
+
+| 安装包 | 链接 |
+| --- | --- |
+| **最新 DMG** | [从 GitHub Releases 下载](https://github.com/williamyangcn/BookmarkX/releases/latest) |
+| 历史版本 | [Releases 页面](https://github.com/williamyangcn/BookmarkX/releases) |
+
+1. 打开 `.dmg`，把 **BookmarkX** 拖进 **应用程序**。
+2. 首次打开若被拦截：系统设置 → 隐私与安全性 → 仍要打开（当前为 ad-hoc 签名）。
+3. 在应用内用 X 登录，然后点 **刷新** 同步书签。
+
+> 若最新 Release 还没有 DMG 附件，可先用 `./Scripts/package-dmg.sh` 本地打包，或等下一版发布。
+
+### 功能
+
+- 将 X 书签同步到本地 SQLite（类似 IMAP：跳过已同步，每次刷新最多新抓 100 条）
+- 四栏界面：快捷方式 · 文件夹 · 列表 · X 帖子预览
+- 未读流程：预览约 30 秒标为已读（字体变细、角标变化）；再次进入「未读」时，已读自动进入归档
+- 按发帖时间分组：今天 / 昨天 / 7 天内 / 15 天内 / 1 个月内 / 今年 / 去年…
+- 重要程度、收藏、归档、删除（仅本地或本地+X）
+- Grok 整理：标题、摘要、分类文件夹、标签（Premium 额度 / API Key / 自动）
+- FTS5 全文搜索
+- 界面语言：简体中文、English
+
+### 运行要求
+
+- macOS 14 Sonoma 或更高
+- X 账号（默认应用内网页登录，无需 Developer Client ID）
+- 可选：X Premium（Grok 额度），或 [xAI API Key](https://console.x.ai/)
+
+### 从源码构建
+
+```bash
+git clone https://github.com/williamyangcn/BookmarkX.git
+cd BookmarkX
+./Scripts/generate.sh          # 需要安装 XcodeGen
+open BookmarkX.xcodeproj
+```
+
+```bash
+export DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer
+xcodebuild -scheme BookmarkX -destination 'platform=macOS' test
+```
+
+### 打包 DMG
+
+```bash
+export DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer
+./Scripts/package-dmg.sh          # 输出 dist/BookmarkX-<version>.dmg
+./Scripts/package-dmg.sh 0.1.0    # 可指定版本号
+```
+
+把生成的 DMG 上传到 [GitHub Releases](https://github.com/williamyangcn/BookmarkX/releases/new)，上方下载按钮即可指向真实安装包。
+
+### 隐私
+
+- 书签只存在你的 Mac（SQLite）
+- 网络请求仅用于 X 同步/登录与 Grok 调用
+- 无统计或追踪 SDK
+- 可随时删除本地数据
+
+### 许可证
 
 [MIT](./LICENSE)

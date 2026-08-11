@@ -789,13 +789,13 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Connect your X account in Settings, then sync. You can also add a sample bookmark from the toolbar."
+            "value": "Connect your X account in Settings, then refresh to sync bookmarks."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "在设置中连接 X 账号后同步。也可以先用工具栏添加一条示例书签。"
+            "value": "在设置中连接 X 账号，然后点刷新同步书签。"
           }
         }
       }
@@ -840,13 +840,13 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Choose an item from the list to view details, summary, and notes."
+            "value": "Select a bookmark from the list to view its preview, summary, and notes."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "从列表中选择一条，查看详情、摘要和备注。"
+            "value": "从列表中选择一条书签，查看预览、摘要和备注。"
           }
         }
       }
@@ -1061,7 +1061,7 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Turn your X bookmarks into a local, searchable knowledge base powered by Grok."
+            "value": "Turn your X bookmarks into a local, searchable knowledge base with Grok."
           }
         },
         "zh-Hans": {
@@ -1435,7 +1435,7 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Tap “Continue with Google” — it stays inside BookmarkX so login cookies are saved. If Google blocks the page, use email/username instead."
+            "value": "Click “Continue with Google” — it stays inside BookmarkX so login cookies are saved. If Google blocks the page, use email/username instead."
           }
         },
         "zh-Hans": {
@@ -1588,7 +1588,7 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Paste Client ID below, then tap Sign in with X again."
+            "value": "Paste the Client ID below, then click Sign in with X again."
           }
         },
         "zh-Hans": {
@@ -1690,13 +1690,13 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Default mode is X Premium Grok after Sign in with X—same membership quota as Grok."
+            "value": "Default: use X Premium Grok after you sign in with X."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "默认在 X 登录后使用 Premium Grok，与 Grok 共用会员额度。"
+            "value": "默认：使用 X 登录后走 Premium Grok。"
           }
         }
       }
@@ -1792,13 +1792,13 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Sign in"
+            "value": "Open Settings"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "去登录"
+            "value": "打开设置"
           }
         }
       }
@@ -2200,13 +2200,13 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Sign in with X only—uses your X Premium Grok membership quota, same idea as Grok."
+            "value": "Sign in with X to use your X Premium Grok quota."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "只需使用 X 登录，直接使用 X Premium Grok 会员额度（和 Grok 一样）。"
+            "value": "使用 X 登录后，直接使用 X Premium Grok 会员额度。"
           }
         }
       }
@@ -2574,13 +2574,13 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Grok API key saved to Keychain."
+            "value": "Grok API key saved."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "Grok API Key 已保存到钥匙串。"
+            "value": "Grok API Key 已保存。"
           }
         }
       }
@@ -2744,13 +2744,13 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Credentials cleared from Keychain."
+            "value": "Stored credentials were cleared."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "已从钥匙串清除凭证。"
+            "value": "已清除已存凭证。"
           }
         }
       }
