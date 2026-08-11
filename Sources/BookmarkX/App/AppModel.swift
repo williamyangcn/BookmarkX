@@ -95,15 +95,30 @@ final class AppModel {
 
         do {
             let result = try await syncService.sync(options: settings.syncOptions)
+            applySyncProgress(from: result)
             try await bookmarkStore?.reload(searchText: searchText)
             syncStatusMessage = AppLocalization.format("sync.status.completedFormat", result.imported,
                 result.updated,
                 result.restored,
                 result.skipped,
                 settings.syncBatchSize)
-            await enrichPendingBookmarks()
+            // Enrichment can take minutes with Grok; don't block the sync spinner.
+            Task { await enrichPendingBookmarks() }
         } catch {
             syncStatusMessage = error.localizedDescription
+        }
+    }
+
+    private func applySyncProgress(from result: BookmarkSyncResult) {
+        // Drop legacy watermark — catch-up now uses consecutive local skips.
+        settings.syncNewestWatermark = nil
+        if result.reachedEndOfRemoteList {
+            settings.syncBackfillComplete = true
+            settings.syncBackfillCursor = nil
+            return
+        }
+        if let cursor = result.newBackfillCursor {
+            settings.syncBackfillCursor = cursor
         }
     }
 

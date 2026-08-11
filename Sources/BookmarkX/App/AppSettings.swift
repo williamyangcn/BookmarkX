@@ -12,6 +12,9 @@ final class AppSettings {
         static let syncBatchSize = "settings.syncBatchSize"
         static let syncSkipAlreadySynced = "settings.syncSkipAlreadySynced"
         static let syncDeleteFromXAfterSync = "settings.syncDeleteFromXAfterSync"
+        static let syncNewestWatermark = "settings.syncNewestWatermark"
+        static let syncBackfillComplete = "settings.syncBackfillComplete"
+        static let syncBackfillCursor = "settings.syncBackfillCursor"
         static let folderTaxonomyVersion = "settings.folderTaxonomyVersion"
     }
 
@@ -67,6 +70,33 @@ final class AppSettings {
         didSet { UserDefaults.standard.set(syncDeleteFromXAfterSync, forKey: Keys.syncDeleteFromXAfterSync) }
     }
 
+    /// Newest remote bookmark ID from the last successful sync (catch-up watermark).
+    var syncNewestWatermark: String? {
+        didSet {
+            if let syncNewestWatermark, !syncNewestWatermark.isEmpty {
+                UserDefaults.standard.set(syncNewestWatermark, forKey: Keys.syncNewestWatermark)
+            } else {
+                UserDefaults.standard.removeObject(forKey: Keys.syncNewestWatermark)
+            }
+        }
+    }
+
+    /// True after a sync walked to the end of the remote bookmark list.
+    var syncBackfillComplete: Bool {
+        didSet { UserDefaults.standard.set(syncBackfillComplete, forKey: Keys.syncBackfillComplete) }
+    }
+
+    /// Pagination cursor for resuming older bookmark backfill.
+    var syncBackfillCursor: String? {
+        didSet {
+            if let syncBackfillCursor, !syncBackfillCursor.isEmpty {
+                UserDefaults.standard.set(syncBackfillCursor, forKey: Keys.syncBackfillCursor)
+            } else {
+                UserDefaults.standard.removeObject(forKey: Keys.syncBackfillCursor)
+            }
+        }
+    }
+
     /// Local folder taxonomy version last applied to the library.
     var folderTaxonomyVersion: Int {
         didSet { UserDefaults.standard.set(folderTaxonomyVersion, forKey: Keys.folderTaxonomyVersion) }
@@ -77,8 +107,16 @@ final class AppSettings {
             batchSize: syncBatchSize,
             newestFirst: true,
             skipAlreadySynced: syncSkipAlreadySynced,
-            deleteFromXAfterSync: syncDeleteFromXAfterSync
+            deleteFromXAfterSync: syncDeleteFromXAfterSync,
+            backfillComplete: syncBackfillComplete,
+            backfillCursor: syncBackfillCursor
         )
+    }
+
+    func resetSyncProgress() {
+        syncNewestWatermark = nil
+        syncBackfillComplete = false
+        syncBackfillCursor = nil
     }
 
     init(defaults: UserDefaults = .standard) {
@@ -110,6 +148,9 @@ final class AppSettings {
         }
 
         syncDeleteFromXAfterSync = defaults.bool(forKey: Keys.syncDeleteFromXAfterSync)
+        syncNewestWatermark = defaults.string(forKey: Keys.syncNewestWatermark)
+        syncBackfillComplete = defaults.bool(forKey: Keys.syncBackfillComplete)
+        syncBackfillCursor = defaults.string(forKey: Keys.syncBackfillCursor)
         folderTaxonomyVersion = defaults.object(forKey: Keys.folderTaxonomyVersion) as? Int ?? 0
 
         // One-time: if AI output is Chinese but UI was left on English, align UI language.

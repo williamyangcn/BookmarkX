@@ -20,7 +20,7 @@ Local-first macOS app for X (Twitter) bookmarks — sync, organize, search, and 
   </a>
 </p>
 
-**Latest:** [v0.2.1](https://github.com/williamyangcn/BookmarkX/releases/tag/v0.2.1) · [Download `BookmarkX-0.2.1.dmg`](https://github.com/williamyangcn/BookmarkX/releases/latest)
+**Latest:** [v0.2.2](https://github.com/williamyangcn/BookmarkX/releases/tag/v0.2.2) · [Download `BookmarkX-0.2.2.dmg`](https://github.com/williamyangcn/BookmarkX/releases/latest)
 
 ### Screenshots / 截图
 
@@ -42,12 +42,18 @@ Local-first macOS app for X (Twitter) bookmarks — sync, organize, search, and 
 
 | Package | Link |
 | --- | --- |
-| **v0.2.1 DMG** | [Download `BookmarkX-0.2.1.dmg`](https://github.com/williamyangcn/BookmarkX/releases/latest) |
+| **v0.2.2 DMG** | [Download `BookmarkX-0.2.2.dmg`](https://github.com/williamyangcn/BookmarkX/releases/latest) |
 | All versions | [Releases page](https://github.com/williamyangcn/BookmarkX/releases) |
 
 1. Open the `.dmg` and drag **BookmarkX** into **Applications**.
 2. On first launch, macOS may ask you to allow an unsigned/ad-hoc build: **System Settings → Privacy & Security → Open Anyway**.
 3. Sign in with X inside the app, then click **Refresh** to sync bookmarks.
+
+### What’s new in 0.2.2
+
+- Faster bookmark sync: stop after a streak of already-local items instead of re-walking the whole library
+- Fix missing newly bookmarked posts (preserve newest-first timeline order; prefer Bookmarks GraphQL over search)
+- Enrichment no longer blocks the sync spinner
 
 ### What’s new in 0.2.1
 
@@ -98,7 +104,7 @@ xcodebuild -scheme BookmarkX -destination 'platform=macOS' test
 ```bash
 export DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer
 ./Scripts/package-dmg.sh          # → dist/BookmarkX-<version>.dmg
-./Scripts/package-dmg.sh 0.2.1    # optional version tag
+./Scripts/package-dmg.sh 0.2.2    # optional version tag
 ```
 
 Upload the DMG on [GitHub Releases](https://github.com/williamyangcn/BookmarkX/releases/new) so the Download badge above points at a real file.
@@ -128,12 +134,18 @@ Upload the DMG on [GitHub Releases](https://github.com/williamyangcn/BookmarkX/r
 
 | 安装包 | 链接 |
 | --- | --- |
-| **v0.2.1 DMG** | [下载 `BookmarkX-0.2.1.dmg`](https://github.com/williamyangcn/BookmarkX/releases/latest) |
+| **v0.2.2 DMG** | [下载 `BookmarkX-0.2.2.dmg`](https://github.com/williamyangcn/BookmarkX/releases/latest) |
 | 历史版本 | [Releases 页面](https://github.com/williamyangcn/BookmarkX/releases) |
 
 1. 打开 `.dmg`，把 **BookmarkX** 拖进 **应用程序**。
 2. 首次打开若被拦截：系统设置 → 隐私与安全性 → 仍要打开（当前为 ad-hoc 签名）。
 3. 在应用内用 X 登录，然后点 **刷新** 同步书签。
+
+### 0.2.2 更新
+
+- 同步更快：连续遇到已本地书签后提前结束，不再整库重扫
+- 修复刚收藏的帖同步不下来（保留时间线顺序；优先 Bookmarks 接口而非搜索时间线）
+- 富化不再卡住同步完成状态
 
 ### 0.2.1 更新
 
@@ -184,7 +196,7 @@ xcodebuild -scheme BookmarkX -destination 'platform=macOS' test
 ```bash
 export DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer
 ./Scripts/package-dmg.sh          # 输出 dist/BookmarkX-<version>.dmg
-./Scripts/package-dmg.sh 0.2.1    # 可指定版本号
+./Scripts/package-dmg.sh 0.2.2    # 可指定版本号
 ```
 
 把生成的 DMG 上传到 [GitHub Releases](https://github.com/williamyangcn/BookmarkX/releases/new)，上方下载按钮即可指向真实安装包。

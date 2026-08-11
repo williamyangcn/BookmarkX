@@ -63,6 +63,7 @@ extension AppModel {
     func signOutX() {
         XOAuthCallbackHub.cancel()
         try? KeychainStore.shared.clearXCredentials()
+        settings.resetSyncProgress()
         connectionStatus.refresh(from: settings)
         Task { await configureGrokClient() }
     }

@@ -726,6 +726,22 @@ enum BookmarkQueries {
         ) ?? false
     }
 
+    /// Batch existence check for one sync page (avoids per-tweet DB round-trips).
+    static func existingBookmarkIDs(db: Database, tweetIDs: [String]) throws -> Set<String> {
+        guard !tweetIDs.isEmpty else { return [] }
+        let placeholders = Array(repeating: "?", count: tweetIDs.count).joined(separator: ",")
+        return try Set(
+            String.fetchAll(
+                db,
+                sql: """
+                SELECT tweet_id FROM bookmarks
+                WHERE is_deleted = 0 AND tweet_id IN (\(placeholders))
+                """,
+                arguments: StatementArguments(tweetIDs)
+            )
+        )
+    }
+
     static func bookmarkRowState(db: Database, tweetID: String) throws -> (exists: Bool, isDeleted: Bool)? {
         struct Row: Decodable, FetchableRecord {
             var isDeleted: Bool

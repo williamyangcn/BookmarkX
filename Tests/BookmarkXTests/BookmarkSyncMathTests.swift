@@ -37,4 +37,25 @@ final class BookmarkSyncMathTests: XCTestCase {
             35
         )
     }
+
+    func testCatchUpStopsAfterConsecutiveLocalSkips() {
+        XCTAssertFalse(
+            BookmarkSyncMath.shouldStopCatchUp(
+                skipAlreadySynced: true,
+                consecutiveSkips: 14
+            )
+        )
+        XCTAssertTrue(
+            BookmarkSyncMath.shouldStopCatchUp(
+                skipAlreadySynced: true,
+                consecutiveSkips: 15
+            )
+        )
+        XCTAssertFalse(
+            BookmarkSyncMath.shouldStopCatchUp(
+                skipAlreadySynced: false,
+                consecutiveSkips: 100
+            )
+        )
+    }
 }

@@ -21,12 +21,17 @@ actor XWebBookmarksClient {
         var lastError: Error?
         for candidate in Self.operationCandidates(from: ids) {
             do {
-                return try await fetch(
+                let page = try await fetch(
                     webSession: webSession,
                     operation: candidate,
                     count: clamped,
                     cursor: cursor
                 )
+                // Empty first page from a stale op — try the next candidate.
+                if page.tweets.isEmpty, cursor == nil, candidate.name != "Bookmarks" {
+                    continue
+                }
+                return page
             } catch {
                 lastError = error
             }
@@ -99,6 +104,24 @@ actor XWebBookmarksClient {
     private static func operationCandidates(from ids: [String: String]) -> [GraphQLOperation] {
         var result: [GraphQLOperation] = []
 
+        // Prefer the real Bookmarks timeline (newest-first). Search timeline can
+        // succeed with incomplete / differently ordered results and hide new bookmarks.
+        if let id = ids["Bookmarks"] {
+            result.append(
+                GraphQLOperation(
+                    queryID: id,
+                    name: "Bookmarks",
+                    variables: [
+                        "count": 20,
+                        "includePromotedContent": false
+                    ],
+                    features: commonFeatures.merging([
+                        "graphql_timeline_v2_bookmark_timeline": true
+                    ]) { _, new in new }
+                )
+            )
+        }
+
         let searchID = ids["BookmarkSearchTimeline"] ?? fallbackSearchQueryID
         result.append(
             GraphQLOperation(
@@ -113,22 +136,6 @@ actor XWebBookmarksClient {
             )
         )
 
-        if let id = ids["Bookmarks"] {
-            result.append(
-                GraphQLOperation(
-                    queryID: id,
-                    name: "Bookmarks",
-                    variables: [
-                        "count": 20,
-                        "includePromotedContent": true
-                    ],
-                    features: commonFeatures.merging([
-                        "graphql_timeline_v2_bookmark_timeline": true
-                    ]) { _, new in new }
-                )
-            )
-        }
-
         for (id, name) in fallbackBookmarks {
             if result.contains(where: { $0.queryID == id && $0.name == name }) { continue }
             result.append(
@@ -137,12 +144,19 @@ actor XWebBookmarksClient {
                     name: name,
                     variables: name == "BookmarkSearchTimeline"
                         ? ["rawQuery": "", "count": 20, "querySource": ""]
-                        : ["count": 20, "includePromotedContent": true],
+                        : ["count": 20, "includePromotedContent": false],
                     features: commonFeatures.merging(
                         name == "Bookmarks" ? ["graphql_timeline_v2_bookmark_timeline": true] : [:]
                     ) { _, new in new }
                 )
             )
+        }
+
+        // Bookmarks before search in fallbacks too.
+        result.sort { lhs, rhs in
+            let l = lhs.name == "Bookmarks" ? 0 : 1
+            let r = rhs.name == "Bookmarks" ? 0 : 1
+            return l < r
         }
 
         return result
@@ -285,14 +299,67 @@ actor XWebBookmarksClient {
             throw XWebSessionError.server(statusCode: 400, message: message)
         }
 
+        // Timeline entry order is newest-first. A raw recursive walk shuffles that
+        // order (and pulls quoted/retweeted tweets), which breaks incremental sync.
+        let ordered = parseOrderedTimelineTweets(from: root)
+        if !ordered.isEmpty {
+            return ordered
+        }
+
+        // Last-resort fallback for unexpected payloads.
         var tweets: [RemoteBookmarkTweet] = []
         var seen = Set<String>()
         walk(root) { object in
-            guard let tweet = parseTweetObject(object), !seen.contains(tweet.id) else { return }
-            seen.insert(tweet.id)
+            guard let tweet = parseTweetObject(object), seen.insert(tweet.id).inserted else { return }
             tweets.append(tweet)
         }
         return tweets
+    }
+
+    /// Prefer `instructions → entries` order so catch-up sees newest bookmarks first.
+    private static func parseOrderedTimelineTweets(from root: [String: Any]) -> [RemoteBookmarkTweet] {
+        var tweets: [RemoteBookmarkTweet] = []
+        var seen = Set<String>()
+
+        walk(root) { object in
+            guard let instructions = object["instructions"] as? [[String: Any]] else { return }
+            for instruction in instructions {
+                guard let entries = instruction["entries"] as? [Any] else { continue }
+                for case let entry as [String: Any] in entries {
+                    guard let tweet = tweetFromTimelineEntry(entry),
+                          seen.insert(tweet.id).inserted else { continue }
+                    tweets.append(tweet)
+                }
+            }
+        }
+
+        return tweets
+    }
+
+    private static func tweetFromTimelineEntry(_ entry: [String: Any]) -> RemoteBookmarkTweet? {
+        let entryID = (entry["entryId"] as? String) ?? ""
+        if entryID.hasPrefix("cursor-") {
+            return nil
+        }
+
+        if let content = entry["content"] as? [String: Any] {
+            let itemContent = (content["itemContent"] as? [String: Any]) ?? content
+            if let tweetResults = (itemContent["tweet_results"] as? [String: Any])
+                ?? (itemContent["tweetResult"] as? [String: Any]),
+               let result = tweetResults["result"] as? [String: Any],
+               let tweet = parseTweetObject(result) {
+                return tweet
+            }
+        }
+
+        // Stay inside this entry so quoted/retweeted nested tweets aren't collected
+        // as separate bookmark rows out of order.
+        var found: RemoteBookmarkTweet?
+        walk(entry) { object in
+            guard found == nil else { return }
+            found = parseTweetObject(object)
+        }
+        return found
     }
 
     private static func parseBottomCursor(from data: Data) -> String? {
@@ -450,9 +517,9 @@ actor XWebBookmarksClient {
     private static let fallbackSearchQueryID = "fHKoSa-2dbV1UbhUy3EvcA"
     private static let fallbackDeleteQueryID = "Wlmlj2-xzySOfYNBodNipg"
     private static let fallbackBookmarks: [(id: String, name: String)] = [
-        ("fHKoSa-2dbV1UbhUy3EvcA", "BookmarkSearchTimeline"),
         ("tmd4ifV8RHltzn8ymGg1aw", "Bookmarks"),
-        ("-LGfdImKeQz0xS_jjUwzlA", "Bookmarks")
+        ("-LGfdImKeQz0xS_jjUwzlA", "Bookmarks"),
+        ("fHKoSa-2dbV1UbhUy3EvcA", "BookmarkSearchTimeline")
     ]
 
     private static let commonFeatures: [String: Bool] = [
