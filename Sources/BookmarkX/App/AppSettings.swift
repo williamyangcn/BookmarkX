@@ -12,7 +12,11 @@ final class AppSettings {
         static let syncBatchSize = "settings.syncBatchSize"
         static let syncSkipAlreadySynced = "settings.syncSkipAlreadySynced"
         static let syncDeleteFromXAfterSync = "settings.syncDeleteFromXAfterSync"
+        static let folderTaxonomyVersion = "settings.folderTaxonomyVersion"
     }
+
+    /// Bump when the local folder taxonomy changes and existing bookmarks should be reclassified.
+    static let currentFolderTaxonomyVersion = 2
 
     var interfaceLanguage: AppLanguage {
         didSet { UserDefaults.standard.set(interfaceLanguage.rawValue, forKey: Keys.interfaceLanguage) }
@@ -60,6 +64,11 @@ final class AppSettings {
         didSet { UserDefaults.standard.set(syncDeleteFromXAfterSync, forKey: Keys.syncDeleteFromXAfterSync) }
     }
 
+    /// Local folder taxonomy version last applied to the library.
+    var folderTaxonomyVersion: Int {
+        didSet { UserDefaults.standard.set(folderTaxonomyVersion, forKey: Keys.folderTaxonomyVersion) }
+    }
+
     var syncOptions: BookmarkSyncOptions {
         BookmarkSyncOptions(
             batchSize: syncBatchSize,
@@ -93,6 +102,7 @@ final class AppSettings {
         }
 
         syncDeleteFromXAfterSync = defaults.bool(forKey: Keys.syncDeleteFromXAfterSync)
+        folderTaxonomyVersion = defaults.object(forKey: Keys.folderTaxonomyVersion) as? Int ?? 0
     }
 }
 

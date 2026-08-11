@@ -4,6 +4,7 @@ struct BookmarkListView: View {
     @Environment(AppModel.self) private var appModel
     @State private var pendingDeleteID: String?
     @State private var filterTab: ListFilterTab = .all
+    @FocusState private var isSearchFocused: Bool
 
     private enum ListFilterTab: String, CaseIterable, Identifiable {
         case all
@@ -26,8 +27,7 @@ struct BookmarkListView: View {
         let items = displayedItems
 
         VStack(spacing: 0) {
-            header
-            filterBar
+            columnChrome
             Divider()
 
             Group {
@@ -50,9 +50,10 @@ struct BookmarkListView: View {
                         ForEach(groupedItems(items)) { section in
                             Section(section.title) {
                                 ForEach(section.items) { item in
-                                    BookmarkRowView(item: item) {
-                                        pendingDeleteID = item.id
-                                    }
+                                    BookmarkRowView(
+                                        item: item,
+                                        showsUnreadStyle: showsUnreadStyle
+                                    )
                                     .tag(item.id)
                                     .contextMenu {
                                         bookmarkContextMenu(for: item)
@@ -68,6 +69,7 @@ struct BookmarkListView: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(Color(nsColor: .windowBackgroundColor))
         .confirmationDialog(
             "bookmarks.delete.title",
             isPresented: Binding(
@@ -94,43 +96,238 @@ struct BookmarkListView: View {
         }
     }
 
-    private var header: some View {
-        HStack(alignment: .firstTextBaseline) {
-            VStack(alignment: .leading, spacing: 4) {
-                Text(listTitle)
-                    .font(.title2.weight(.semibold))
-                Text("bookmarks.count \(displayedItems.count)")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+    /// Column-3 top chrome: refresh + search + filter, then selection actions.
+    private var columnChrome: some View {
+        VStack(spacing: 10) {
+            HStack(spacing: 10) {
+                Button {
+                    Task { await appModel.refreshBookmarks() }
+                } label: {
+                    Group {
+                        if appModel.isSyncing || appModel.isEnriching {
+                            ProgressView()
+                                .controlSize(.small)
+                        } else {
+                            Image(systemName: "arrow.clockwise")
+                        }
+                    }
+                    .font(.system(size: 13, weight: .semibold))
+                    .frame(width: 28, height: 28)
+                }
+                .buttonStyle(.plain)
+                .disabled(appModel.isSyncing || appModel.isEnriching)
+                .help("action.refresh.help")
+                .background(Circle().fill(Color.primary.opacity(0.06)))
+
+                searchField
+
+                if showsUnreadStyle {
+                    Menu {
+                        ForEach(ListFilterTab.allCases) { tab in
+                            Button {
+                                filterTab = tab
+                            } label: {
+                                HStack {
+                                    Text(tabTitle(tab))
+                                    if filterTab == tab {
+                                        Image(systemName: "checkmark")
+                                    }
+                                }
+                            }
+                        }
+                    } label: {
+                        Image(systemName: "line.3.horizontal.decrease")
+                            .font(.system(size: 13, weight: .semibold))
+                            .frame(width: 28, height: 28)
+                    }
+                    .menuStyle(.borderlessButton)
+                    .help(Text("bookmarks.filter.menu"))
+                    .background(Circle().fill(Color.primary.opacity(0.06)))
+                }
             }
-            Spacer()
+
+            HStack(spacing: 12) {
+                selectionActionBar
+                Spacer(minLength: 8)
+                VStack(alignment: .trailing, spacing: 2) {
+                    Text(listTitle)
+                        .font(.subheadline.weight(.semibold))
+                        .lineLimit(1)
+                    if let status = statusLine {
+                        Text(status)
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                    } else {
+                        Text("bookmarks.count \(displayedItems.count)")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            }
         }
-        .padding(.horizontal, 16)
-        .padding(.top, 14)
-        .padding(.bottom, 8)
+        .padding(.horizontal, 12)
+        .padding(.top, 10)
+        .padding(.bottom, 10)
+        .background(.bar)
     }
 
-    private var filterBar: some View {
-        HStack(spacing: 8) {
-            ForEach(ListFilterTab.allCases) { tab in
+    private var searchField: some View {
+        HStack(spacing: 6) {
+            Image(systemName: "magnifyingglass")
+                .font(.system(size: 13, weight: .medium))
+                .foregroundStyle(.secondary)
+            TextField(
+                "search.prompt",
+                text: Binding(
+                    get: { appModel.searchText },
+                    set: { appModel.searchText = $0 }
+                )
+            )
+            .textFieldStyle(.plain)
+            .focused($isSearchFocused)
+            if !appModel.searchText.isEmpty {
                 Button {
-                    filterTab = tab
+                    appModel.searchText = ""
                 } label: {
-                    Text(tabTitle(tab))
-                        .font(.caption.weight(.semibold))
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 6)
-                        .background(
-                            filterTab == tab ? Color.accentColor.opacity(0.15) : Color.clear,
-                            in: Capsule()
-                        )
+                    Image(systemName: "xmark.circle.fill")
+                        .foregroundStyle(.secondary)
                 }
                 .buttonStyle(.plain)
             }
-            Spacer()
         }
-        .padding(.horizontal, 16)
-        .padding(.bottom, 10)
+        .padding(.horizontal, 10)
+        .padding(.vertical, 7)
+        .background(
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .fill(Color(nsColor: .textBackgroundColor))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .strokeBorder(Color.primary.opacity(0.08), lineWidth: 1)
+        )
+    }
+
+    @ViewBuilder
+    private var selectionActionBar: some View {
+        let selected = selectedItem
+        HStack(spacing: 0) {
+            actionIcon(
+                systemImage: selected?.isRead == true ? "envelope.badge" : "envelope.open",
+                help: selected?.isRead == true ? "bookmarks.markUnread" : "bookmarks.markRead",
+                disabled: selected == nil
+            ) {
+                guard let selected else { return }
+                Task { await appModel.setRead(tweetID: selected.tweetID, isRead: !selected.isRead) }
+            }
+
+            pillDivider
+
+            actionIcon(
+                systemImage: selected?.isFavorite == true ? "star.fill" : "star",
+                tint: selected?.isFavorite == true ? .yellow : nil,
+                help: selected?.isFavorite == true ? "bookmarks.unfavorite" : "bookmarks.favorite",
+                disabled: selected == nil
+            ) {
+                guard let selected else { return }
+                Task { await appModel.setFavorite(tweetID: selected.tweetID, isFavorite: !selected.isFavorite) }
+            }
+
+            pillDivider
+
+            Menu {
+                ForEach(BookmarkImportance.allCases) { level in
+                    Button {
+                        guard let selected else { return }
+                        Task { await appModel.setImportance(tweetID: selected.tweetID, importance: level) }
+                    } label: {
+                        Label(level.titleKey, systemImage: level.systemImage)
+                    }
+                    .disabled(selected == nil)
+                }
+            } label: {
+                Image(systemName: selected?.importance == .high ? "exclamationmark.circle.fill" : "exclamationmark.circle")
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundStyle(selected?.importance == .high ? Color.red : Color.primary.opacity(selected == nil ? 0.35 : 0.85))
+                    .frame(width: 30, height: 28)
+            }
+            .menuStyle(.borderlessButton)
+            .disabled(selected == nil)
+            .help(Text("bookmarks.importance"))
+
+            pillDivider
+
+            actionIcon(
+                systemImage: "archivebox",
+                help: selected?.isArchived == true ? "bookmarks.unarchive" : "bookmarks.archive",
+                disabled: selected == nil
+            ) {
+                guard let selected else { return }
+                Task { await appModel.setArchived(tweetID: selected.tweetID, isArchived: !selected.isArchived) }
+            }
+
+            pillDivider
+
+            actionIcon(
+                systemImage: "trash",
+                tint: .red,
+                help: "bookmarks.delete.local",
+                disabled: selected == nil
+            ) {
+                guard let selected else { return }
+                pendingDeleteID = selected.id
+            }
+        }
+        .padding(.horizontal, 4)
+        .background(
+            Capsule(style: .continuous)
+                .fill(Color.primary.opacity(0.06))
+        )
+    }
+
+    private var pillDivider: some View {
+        Rectangle()
+            .fill(Color.primary.opacity(0.12))
+            .frame(width: 1, height: 14)
+            .padding(.horizontal, 2)
+    }
+
+    private func actionIcon(
+        systemImage: String,
+        tint: Color? = nil,
+        help: LocalizedStringResource,
+        disabled: Bool,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            Image(systemName: systemImage)
+                .font(.system(size: 13, weight: .medium))
+                .foregroundStyle(tint ?? Color.primary.opacity(disabled ? 0.35 : 0.85))
+                .frame(width: 30, height: 28)
+        }
+        .buttonStyle(.plain)
+        .disabled(disabled)
+        .help(Text(help))
+    }
+
+    /// Archive is a done pile — never emphasize unread there.
+    private var showsUnreadStyle: Bool {
+        appModel.selectedSidebarItem != .archive
+    }
+
+    private var selectedItem: BookmarkListItem? {
+        guard let id = appModel.selectedBookmarkID else { return nil }
+        return appModel.bookmarkStore?.items.first(where: { $0.id == id })
+    }
+
+    private var statusLine: String? {
+        if appModel.isSyncing {
+            return String(localized: "sync.status.running")
+        }
+        if appModel.isEnriching {
+            return String(localized: "enrichment.status.running")
+        }
+        return appModel.syncStatusMessage
     }
 
     private func tabTitle(_ tab: ListFilterTab) -> String {
@@ -158,6 +355,7 @@ struct BookmarkListView: View {
 
     private var displayedItems: [BookmarkListItem] {
         let base = appModel.filteredBookmarks.sorted { $0.postedAt > $1.postedAt }
+        guard showsUnreadStyle else { return base }
         switch filterTab {
         case .all: return base
         case .unread: return base.filter { !$0.isRead }
@@ -235,11 +433,12 @@ struct BookmarkListView: View {
 }
 
 private struct BookmarkRowView: View {
-    @Environment(AppModel.self) private var appModel
     let item: BookmarkListItem
-    var onDelete: () -> Void
+    var showsUnreadStyle: Bool = true
 
-    @State private var isHovered = false
+    private var appearsUnread: Bool {
+        showsUnreadStyle && !item.isRead
+    }
 
     var body: some View {
         HStack(alignment: .top, spacing: 12) {
@@ -248,7 +447,7 @@ private struct BookmarkRowView: View {
             VStack(alignment: .leading, spacing: 5) {
                 HStack(alignment: .firstTextBaseline, spacing: 8) {
                     Text(item.authorName)
-                        .font(.subheadline.weight(item.isRead ? .medium : .bold))
+                        .font(.subheadline.weight(appearsUnread ? .bold : .medium))
                         .lineLimit(1)
                     Text("@\(item.authorUsername)")
                         .font(.caption.weight(.semibold))
@@ -262,7 +461,7 @@ private struct BookmarkRowView: View {
                 }
 
                 Text(displayTitle)
-                    .font(.body.weight(item.isRead ? .regular : .semibold))
+                    .font(.body.weight(appearsUnread ? .semibold : .regular))
                     .lineLimit(1)
 
                 Text(snippet)
@@ -289,15 +488,11 @@ private struct BookmarkRowView: View {
                             .foregroundStyle(.secondary)
                     }
                     Spacer()
-                    if isHovered {
-                        rowToolbar
-                    }
                 }
             }
         }
         .padding(.vertical, 4)
-        .opacity(item.isRead ? 0.88 : 1)
-        .onHover { isHovered = $0 }
+        .opacity(appearsUnread ? 1 : 0.88)
     }
 
     private var authorAvatar: some View {
@@ -349,41 +544,17 @@ private struct BookmarkRowView: View {
         }
     }
 
-    private var rowToolbar: some View {
-        HStack(spacing: 4) {
-            Button {
-                Task { await appModel.setImportance(tweetID: item.tweetID, importance: item.importance == .high ? .normal : .high) }
-            } label: {
-                Image(systemName: item.importance == .high ? "exclamationmark.circle.fill" : "exclamationmark.circle")
-            }
-            .help(Text("bookmarks.importance"))
-
-            Button {
-                Task { await appModel.setArchived(tweetID: item.tweetID, isArchived: !item.isArchived) }
-            } label: {
-                Image(systemName: "archivebox")
-            }
-            .help(Text(item.isArchived ? "bookmarks.unarchive" : "bookmarks.archive"))
-
-            Button(role: .destructive, action: onDelete) {
-                Image(systemName: "trash")
-            }
-            .help(Text("bookmarks.delete.local"))
-        }
-        .buttonStyle(.borderless)
-        .controlSize(.small)
-    }
-
     private var displayTitle: String {
         if let title = item.title?.trimmingCharacters(in: .whitespacesAndNewlines),
-           !title.isEmpty {
+           !title.isEmpty,
+           !LocalBookmarkClassifier.isWeakTitle(title) {
             return title
         }
-        let firstLine = item.text
-            .split(whereSeparator: { ".!?。！？\n".contains($0) })
-            .first
-            .map(String.init) ?? item.text
-        return String(firstLine.trimmingCharacters(in: .whitespacesAndNewlines).prefix(80))
+        return LocalBookmarkClassifier.makeTitle(
+            text: item.text,
+            authorUsername: item.authorUsername,
+            hasMedia: item.mediaCount > 0
+        )
     }
 
     private var snippet: String {

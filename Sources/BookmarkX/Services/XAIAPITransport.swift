@@ -16,7 +16,11 @@ struct XAIAPITransport: Sendable {
     var session: URLSession = .shared
     var baseURL = URL(string: "https://api.x.ai/v1")!
 
-    func enrich(tweetText: String, authorUsername: String?) async throws -> GrokPayload {
+    func enrich(
+        tweetText: String,
+        authorUsername: String?,
+        existingFolders: [String] = []
+    ) async throws -> GrokPayload {
         let url = baseURL.appending(path: "chat/completions")
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
@@ -29,6 +33,21 @@ struct XAIAPITransport: Sendable {
         case .system: "Match the language of the tweet when possible; otherwise use Simplified Chinese."
         }
 
+        let folderHint: String
+        if existingFolders.isEmpty {
+            folderHint = """
+            Invent a short reusable category (2-8 chars in Chinese, or 1-3 English words).
+            Prefer specific topics over generic labels like Inbox/Misc/Other.
+            """
+        } else {
+            let listed = existingFolders.prefix(40).joined(separator: ", ")
+            folderHint = """
+            Prefer an existing folder when it fits: \(listed).
+            If none fit well, invent a NEW short reusable category so folders can grow with content.
+            Do not force everything into a catch-all like 待读 / Inbox.
+            """
+        }
+
         let authorLine = authorUsername.map { "Author: @\($0)\n" } ?? ""
         let userPrompt = """
         \(authorLine)Tweet:
@@ -37,7 +56,7 @@ struct XAIAPITransport: Sendable {
         Return JSON only with keys:
         - title: a concise descriptive title, no more than 20 words
         - summary: one or two concise sentences
-        - category: a short topic label
+        - category: a short topic folder label
         - tags: 1 to 5 short tags
         """
 
@@ -52,6 +71,7 @@ struct XAIAPITransport: Sendable {
                     You organize X/Twitter bookmarks into a personal knowledge base.
                     \(languageInstruction)
                     Keep category and tags short and reusable.
+                    \(folderHint)
                     """
                 ],
                 [

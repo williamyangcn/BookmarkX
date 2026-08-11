@@ -137,6 +137,23 @@
         }
       }
     },
+    "enrichment.status.nothingToReclassify": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No bookmarks to reclassify."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "没有可重新分类的书签。"
+          }
+        }
+      }
+    },
     "enrichment.status.runningFormat": {
       "extractionState": "manual",
       "localizations": {
@@ -500,13 +517,13 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Each refresh keeps paging past already-synced bookmarks until it imports up to the batch size of new ones (default 100), or there are no more on X. Deleting from X after sync is off by default."
+            "value": "Each refresh keeps paging past already-synced bookmarks until it imports up to the batch size of new ones (default 100), or there are no more on X. New bookmarks get smart folders from content; rebuild folders anytime to re-scan the whole library."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "每次刷新会跳过已同步书签并继续向后翻页，直到新抓取满设定条数（默认 100），或 X 上没有更多。默认同步后不从 X 删除。"
+            "value": "每次刷新会跳过已同步书签并继续向后翻页，直到新抓取满设定条数（默认 100），或 X 上没有更多。新书签会按内容智能归入/新建文件夹；也可随时重建文件夹以重扫全部书签。"
           }
         }
       }
@@ -575,6 +592,23 @@
           "stringUnit": {
             "state": "translated",
             "value": "立即同步"
+          }
+        }
+      }
+    },
+    "settings.reclassifyAll": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Rebuild folders from all bookmarks"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "按全部书签重建文件夹"
           }
         }
       }
@@ -3227,6 +3261,23 @@
           "stringUnit": {
             "state": "translated",
             "value": "高"
+          }
+        }
+      }
+    },
+    "bookmarks.filter.menu": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Filter"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "筛选"
           }
         }
       }

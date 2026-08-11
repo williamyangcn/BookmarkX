@@ -104,24 +104,48 @@ actor GrokClient {
         }
     }
 
-    func enrich(tweetText: String, authorUsername: String? = nil) async throws -> GrokEnrichment {
+    func enrich(
+        tweetText: String,
+        authorUsername: String? = nil,
+        existingFolders: [String] = []
+    ) async throws -> GrokEnrichment {
         switch snapshot.mode {
         case .xPremium:
-            return try await enrichWithXPremium(tweetText: tweetText, authorUsername: authorUsername)
+            return try await enrichWithXPremium(
+                tweetText: tweetText,
+                authorUsername: authorUsername,
+                existingFolders: existingFolders
+            )
         case .apiKey:
-            return try await enrichWithAPIKey(tweetText: tweetText, authorUsername: authorUsername)
+            return try await enrichWithAPIKey(
+                tweetText: tweetText,
+                authorUsername: authorUsername,
+                existingFolders: existingFolders
+            )
         case .auto:
             if snapshot.isXConnected {
                 do {
-                    return try await enrichWithXPremium(tweetText: tweetText, authorUsername: authorUsername)
+                    return try await enrichWithXPremium(
+                        tweetText: tweetText,
+                        authorUsername: authorUsername,
+                        existingFolders: existingFolders
+                    )
                 } catch {
                     if hasAPIKey {
-                        return try await enrichWithAPIKey(tweetText: tweetText, authorUsername: authorUsername)
+                        return try await enrichWithAPIKey(
+                            tweetText: tweetText,
+                            authorUsername: authorUsername,
+                            existingFolders: existingFolders
+                        )
                     }
                     throw error
                 }
             }
-            return try await enrichWithAPIKey(tweetText: tweetText, authorUsername: authorUsername)
+            return try await enrichWithAPIKey(
+                tweetText: tweetText,
+                authorUsername: authorUsername,
+                existingFolders: existingFolders
+            )
         }
     }
 
@@ -129,7 +153,11 @@ actor GrokClient {
         snapshot.apiKey?.isEmpty == false
     }
 
-    private func enrichWithAPIKey(tweetText: String, authorUsername: String?) async throws -> GrokEnrichment {
+    private func enrichWithAPIKey(
+        tweetText: String,
+        authorUsername: String?,
+        existingFolders: [String]
+    ) async throws -> GrokEnrichment {
         guard let apiKey = snapshot.apiKey, !apiKey.isEmpty else {
             throw GrokError.apiKeyMissing
         }
@@ -138,7 +166,11 @@ actor GrokClient {
             apiKey: apiKey,
             model: snapshot.model,
             outputLanguage: snapshot.outputLanguage
-        ).enrich(tweetText: tweetText, authorUsername: authorUsername)
+        ).enrich(
+            tweetText: tweetText,
+            authorUsername: authorUsername,
+            existingFolders: existingFolders
+        )
 
         return GrokEnrichment(
             title: payload.title,
@@ -150,7 +182,11 @@ actor GrokClient {
         )
     }
 
-    private func enrichWithXPremium(tweetText: String, authorUsername: String?) async throws -> GrokEnrichment {
+    private func enrichWithXPremium(
+        tweetText: String,
+        authorUsername: String?,
+        existingFolders: [String]
+    ) async throws -> GrokEnrichment {
         guard snapshot.isXConnected else {
             throw GrokError.premiumRequiresX
         }
@@ -161,7 +197,11 @@ actor GrokClient {
             username: snapshot.xUsername,
             model: snapshot.model,
             outputLanguage: snapshot.outputLanguage
-        ).enrich(tweetText: tweetText, authorUsername: authorUsername)
+        ).enrich(
+            tweetText: tweetText,
+            authorUsername: authorUsername,
+            existingFolders: existingFolders
+        )
 
         return GrokEnrichment(
             title: payload.title,

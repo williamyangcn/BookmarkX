@@ -56,8 +56,15 @@ final class AppModel {
             await seedPreviewWebSession()
             phase = .ready
             await enterInbox()
-            if connectionStatus.isGrokConfigured {
-                Task { await enrichPendingBookmarks() }
+            Task {
+                if let fixed = try? await bookmarkStore?.repairWeakTitles(), fixed > 0 {
+                    try? await bookmarkStore?.reload(searchText: searchText)
+                }
+                if settings.folderTaxonomyVersion < AppSettings.currentFolderTaxonomyVersion {
+                    await reclassifyAllBookmarks()
+                } else {
+                    await enrichPendingBookmarks()
+                }
             }
         } catch {
             phase = .failed(error.localizedDescription)
@@ -106,8 +113,9 @@ final class AppModel {
 
     /// Generates title, summary, category folder, and tags for all unprocessed
     /// active synced bookmarks. Existing rows are picked up once by `processed_at`.
+    /// Always allowed: falls back to the local classifier when Grok is unavailable.
     func enrichPendingBookmarks() async {
-        guard !isEnriching, connectionStatus.isGrokConfigured else { return }
+        guard !isEnriching else { return }
         guard let bookmarkStore else { return }
 
         isEnriching = true
@@ -117,75 +125,132 @@ final class AppModel {
             await configureGrokClient()
             let items = try await bookmarkStore.pendingEnrichmentItems()
             guard !items.isEmpty else { return }
-
-            var completed = 0
-            var failed = 0
-            var firstError: String?
-            var useLocalFallback = false
-
-            for item in items {
-                syncStatusMessage = String(
-                    format: String(localized: "enrichment.status.runningFormat"),
-                    locale: .current,
-                    completed + failed + 1,
-                    items.count
-                )
-                do {
-                    let enrichment: GrokEnrichment
-                    if useLocalFallback {
-                        enrichment = LocalBookmarkClassifier.enrich(
-                            text: item.text,
-                            authorUsername: item.authorUsername
-                        )
-                    } else {
-                        do {
-                            enrichment = try await grokClient.enrich(
-                                tweetText: item.text,
-                                authorUsername: item.authorUsername
-                            )
-                        } catch {
-                            useLocalFallback = true
-                            Self.logger.error(
-                                "Grok unavailable; using local classifier: \(error.localizedDescription, privacy: .public)"
-                            )
-                            enrichment = LocalBookmarkClassifier.enrich(
-                                text: item.text,
-                                authorUsername: item.authorUsername
-                            )
-                        }
-                    }
-                    try await bookmarkStore.saveEnrichment(
-                        tweetID: item.tweetID,
-                        enrichment: enrichment
-                    )
-                    completed += 1
-                } catch {
-                    failed += 1
-                    if firstError == nil {
-                        firstError = error.localizedDescription
-                        Self.logger.error("Saving enrichment failed: \(error.localizedDescription, privacy: .public)")
-                    }
-                }
-            }
-
-            try await bookmarkStore.reload(searchText: searchText)
-            if failed == 0 {
-                syncStatusMessage = String(
-                    format: String(localized: "enrichment.status.completedFormat"),
-                    locale: .current,
-                    completed
-                )
-            } else {
-                syncStatusMessage = String(
-                    format: String(localized: "enrichment.status.partialFormat"),
-                    locale: .current,
-                    completed,
-                    failed,
-                    firstError ?? ""
-                )
-            }
+            await runEnrichment(items: items, forceLocal: !connectionStatus.isGrokConfigured)
         } catch {
             syncStatusMessage = error.localizedDescription
+        }
+    }
+
+    /// Re-run classification for every downloaded bookmark so folders rebuild from content.
+    /// Uses the local taxonomy (fast / deterministic). Safe to call repeatedly.
+    func reclassifyAllBookmarks() async {
+        guard !isEnriching else { return }
+        guard let bookmarkStore else { return }
+
+        isEnriching = true
+        defer { isEnriching = false }
+
+        do {
+            let items = try await bookmarkStore.allEnrichmentItems()
+            guard !items.isEmpty else {
+                syncStatusMessage = String(localized: "enrichment.status.nothingToReclassify")
+                return
+            }
+            await runEnrichment(items: items, forceLocal: true)
+            try await bookmarkStore.pruneEmptyFolders()
+            try await bookmarkStore.reload(searchText: searchText)
+            settings.folderTaxonomyVersion = AppSettings.currentFolderTaxonomyVersion
+        } catch {
+            syncStatusMessage = error.localizedDescription
+        }
+    }
+
+    private func runEnrichment(items: [BookmarkEnrichmentItem], forceLocal: Bool) async {
+        guard let bookmarkStore else { return }
+
+        var completed = 0
+        var failed = 0
+        var firstError: String?
+        var useLocalFallback = forceLocal
+        var existingFolders = (try? await bookmarkStore.folderNames()) ?? []
+
+        for item in items {
+            syncStatusMessage = String(
+                format: String(localized: "enrichment.status.runningFormat"),
+                locale: .current,
+                completed + failed + 1,
+                items.count
+            )
+            do {
+                var enrichment: GrokEnrichment
+                if useLocalFallback {
+                    enrichment = LocalBookmarkClassifier.enrich(
+                        text: item.text,
+                        authorUsername: item.authorUsername,
+                        existingFolders: existingFolders,
+                        hasMedia: item.hasMedia
+                    )
+                } else {
+                    do {
+                        enrichment = try await grokClient.enrich(
+                            tweetText: item.text,
+                            authorUsername: item.authorUsername,
+                            existingFolders: existingFolders
+                        )
+                        enrichment.category = LocalBookmarkClassifier.resolveCategory(
+                            enrichment.category,
+                            existingFolders: existingFolders
+                        )
+                    } catch {
+                        useLocalFallback = true
+                        Self.logger.error(
+                            "Grok unavailable; using local classifier: \(error.localizedDescription, privacy: .public)"
+                        )
+                        enrichment = LocalBookmarkClassifier.enrich(
+                            text: item.text,
+                            authorUsername: item.authorUsername,
+                            existingFolders: existingFolders,
+                            hasMedia: item.hasMedia
+                        )
+                    }
+                }
+
+                if LocalBookmarkClassifier.isWeakTitle(enrichment.title) {
+                    enrichment.title = LocalBookmarkClassifier.makeTitle(
+                        text: item.text,
+                        authorUsername: item.authorUsername,
+                        hasMedia: item.hasMedia
+                    )
+                }
+                if LocalBookmarkClassifier.isWeakTitle(enrichment.summary)
+                    || enrichment.summary.lowercased().hasPrefix("http") {
+                    enrichment.summary = LocalBookmarkClassifier.makeSummary(text: item.text)
+                }
+
+                try await bookmarkStore.saveEnrichment(
+                    tweetID: item.tweetID,
+                    enrichment: enrichment
+                )
+                if !existingFolders.contains(where: {
+                    $0.caseInsensitiveCompare(enrichment.category) == .orderedSame
+                }) {
+                    existingFolders.append(enrichment.category)
+                }
+                completed += 1
+            } catch {
+                failed += 1
+                if firstError == nil {
+                    firstError = error.localizedDescription
+                    Self.logger.error("Saving enrichment failed: \(error.localizedDescription, privacy: .public)")
+                }
+            }
+        }
+
+        try? await bookmarkStore.reload(searchText: searchText)
+        if failed == 0 {
+            syncStatusMessage = String(
+                format: String(localized: "enrichment.status.completedFormat"),
+                locale: .current,
+                completed
+            )
+        } else {
+            syncStatusMessage = String(
+                format: String(localized: "enrichment.status.partialFormat"),
+                locale: .current,
+                completed,
+                failed,
+                firstError ?? ""
+            )
         }
     }
 

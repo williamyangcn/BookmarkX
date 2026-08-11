@@ -10,7 +10,11 @@ struct XPremiumGrokTransport: Sendable {
     var outputLanguage: AppLanguage
     var session: URLSession = .shared
 
-    func enrich(tweetText: String, authorUsername: String?) async throws -> GrokPayload {
+    func enrich(
+        tweetText: String,
+        authorUsername: String?,
+        existingFolders: [String] = []
+    ) async throws -> GrokPayload {
         if let webSession {
             do {
                 return try await XWebSessionClient(session: session).enrichWithPremiumGrok(
@@ -18,7 +22,8 @@ struct XPremiumGrokTransport: Sendable {
                     tweetText: tweetText,
                     authorUsername: authorUsername,
                     outputLanguage: outputLanguage,
-                    model: preferredPremiumModel
+                    model: preferredPremiumModel,
+                    existingFolders: existingFolders
                 )
             } catch {
                 // Fall through to OAuth token attempt if present.
@@ -38,7 +43,11 @@ struct XPremiumGrokTransport: Sendable {
                 model: preferredPremiumModel,
                 outputLanguage: outputLanguage,
                 session: session
-            ).enrich(tweetText: tweetText, authorUsername: authorUsername)
+            ).enrich(
+                tweetText: tweetText,
+                authorUsername: authorUsername,
+                existingFolders: existingFolders
+            )
         } catch GrokError.server(let statusCode, let message) where [401, 403, 404].contains(statusCode) {
             throw GrokError.premiumUnavailable(
                 String(

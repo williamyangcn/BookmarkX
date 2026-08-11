@@ -116,6 +116,34 @@ final class BookmarkStore {
         }
     }
 
+    /// All active synced bookmarks — used for force reclassify / folder rebuild.
+    func allEnrichmentItems() async throws -> [BookmarkEnrichmentItem] {
+        try await database.dbWriter.read { db in
+            try BookmarkQueries.fetchAllEnrichmentItems(db: db)
+        }
+    }
+
+    func folderNames() async throws -> [String] {
+        try await database.dbWriter.read { db in
+            try String.fetchAll(db, sql: "SELECT name FROM folders ORDER BY sort_order, name")
+        }
+    }
+
+    /// Drop folders that no longer contain any non-deleted bookmarks.
+    func pruneEmptyFolders() async throws {
+        try await database.dbWriter.write { db in
+            try db.execute(
+                sql: """
+                DELETE FROM folders
+                WHERE id NOT IN (
+                    SELECT DISTINCT folder_id FROM bookmarks
+                    WHERE folder_id IS NOT NULL AND is_deleted = 0
+                )
+                """
+            )
+        }
+    }
+
     func saveEnrichment(
         tweetID: String,
         enrichment: GrokEnrichment
@@ -128,12 +156,22 @@ final class BookmarkStore {
             )
         }
     }
+
+    /// Fix placeholder / junk AI titles without re-running full classification.
+    @discardableResult
+    func repairWeakTitles() async throws -> Int {
+        try await database.dbWriter.write { db in
+            try BookmarkQueries.repairWeakTitles(db: db)
+        }
+    }
 }
 
 struct BookmarkEnrichmentItem: Sendable, Equatable {
     var tweetID: String
     var text: String
     var authorUsername: String
+    var hasMedia: Bool = false
+    var currentTitle: String? = nil
 }
 
 enum BookmarkUpsertOutcome: Equatable {
@@ -376,11 +414,15 @@ enum BookmarkQueries {
             var tweetID: String
             var text: String
             var authorUsername: String
+            var hasMedia: Bool
+            var currentTitle: String?
 
             enum CodingKeys: String, CodingKey {
                 case tweetID = "tweet_id"
                 case text
                 case authorUsername = "author_username"
+                case hasMedia = "has_media"
+                case currentTitle = "current_title"
             }
         }
 
@@ -390,7 +432,9 @@ enum BookmarkQueries {
             SELECT
                 b.tweet_id AS tweet_id,
                 t.text AS text,
-                a.username AS author_username
+                a.username AS author_username,
+                EXISTS(SELECT 1 FROM media m WHERE m.tweet_id = b.tweet_id) AS has_media,
+                ai.title AS current_title
             FROM bookmarks b
             JOIN tweets t ON t.id = b.tweet_id
             JOIN authors a ON a.id = t.author_id
@@ -410,9 +454,130 @@ enum BookmarkQueries {
             BookmarkEnrichmentItem(
                 tweetID: $0.tweetID,
                 text: $0.text,
-                authorUsername: $0.authorUsername
+                authorUsername: $0.authorUsername,
+                hasMedia: $0.hasMedia,
+                currentTitle: $0.currentTitle
             )
         }
+    }
+
+    static func fetchAllEnrichmentItems(db: Database) throws -> [BookmarkEnrichmentItem] {
+        struct Row: Decodable, FetchableRecord {
+            var tweetID: String
+            var text: String
+            var authorUsername: String
+            var hasMedia: Bool
+            var currentTitle: String?
+
+            enum CodingKeys: String, CodingKey {
+                case tweetID = "tweet_id"
+                case text
+                case authorUsername = "author_username"
+                case hasMedia = "has_media"
+                case currentTitle = "current_title"
+            }
+        }
+
+        return try Row.fetchAll(
+            db,
+            sql: """
+            SELECT
+                b.tweet_id AS tweet_id,
+                t.text AS text,
+                a.username AS author_username,
+                EXISTS(SELECT 1 FROM media m WHERE m.tweet_id = b.tweet_id) AS has_media,
+                ai.title AS current_title
+            FROM bookmarks b
+            JOIN tweets t ON t.id = b.tweet_id
+            JOIN authors a ON a.id = t.author_id
+            LEFT JOIN ai_results ai ON ai.tweet_id = b.tweet_id
+            WHERE b.is_deleted = 0
+              AND b.synced_at IS NOT NULL
+            ORDER BY b.bookmarked_at DESC
+            """
+        ).map {
+            BookmarkEnrichmentItem(
+                tweetID: $0.tweetID,
+                text: $0.text,
+                authorUsername: $0.authorUsername,
+                hasMedia: $0.hasMedia,
+                currentTitle: $0.currentTitle
+            )
+        }
+    }
+
+    static func repairWeakTitles(db: Database) throws -> Int {
+        struct Row: Decodable, FetchableRecord {
+            var tweetID: String
+            var text: String
+            var authorUsername: String
+            var hasMedia: Bool
+            var title: String?
+            var summary: String?
+
+            enum CodingKeys: String, CodingKey {
+                case tweetID = "tweet_id"
+                case text
+                case authorUsername = "author_username"
+                case hasMedia = "has_media"
+                case title
+                case summary
+            }
+        }
+
+        let rows = try Row.fetchAll(
+            db,
+            sql: """
+            SELECT
+                b.tweet_id AS tweet_id,
+                t.text AS text,
+                a.username AS author_username,
+                EXISTS(SELECT 1 FROM media m WHERE m.tweet_id = b.tweet_id) AS has_media,
+                ai.title AS title,
+                ai.summary AS summary
+            FROM bookmarks b
+            JOIN tweets t ON t.id = b.tweet_id
+            JOIN authors a ON a.id = t.author_id
+            JOIN ai_results ai ON ai.tweet_id = b.tweet_id
+            WHERE b.is_deleted = 0
+            """
+        )
+
+        var fixed = 0
+        let now = Date()
+        for row in rows {
+            let titleNeedsFix = LocalBookmarkClassifier.isWeakTitle(row.title ?? "")
+            let rawSummary = row.summary?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+            let summaryNeedsFix = LocalBookmarkClassifier.isWeakTitle(rawSummary)
+                || rawSummary.lowercased().hasPrefix("http")
+                || rawSummary == "（无文字内容）"
+            guard titleNeedsFix || summaryNeedsFix else { continue }
+
+            let newTitle = LocalBookmarkClassifier.makeTitle(
+                text: row.text,
+                authorUsername: row.authorUsername,
+                hasMedia: row.hasMedia
+            )
+            let newSummary = summaryNeedsFix
+                ? LocalBookmarkClassifier.makeSummary(text: row.text)
+                : (row.summary ?? LocalBookmarkClassifier.makeSummary(text: row.text))
+
+            try db.execute(
+                sql: """
+                UPDATE ai_results
+                SET title = ?, summary = ?, updated_at = ?
+                WHERE tweet_id = ?
+                """,
+                arguments: [
+                    titleNeedsFix ? newTitle : (row.title ?? newTitle),
+                    newSummary,
+                    now,
+                    row.tweetID
+                ]
+            )
+            fixed += 1
+        }
+        return fixed
     }
 
     static func saveEnrichment(

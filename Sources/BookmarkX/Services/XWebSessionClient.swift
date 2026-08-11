@@ -97,12 +97,24 @@ actor XWebSessionClient {
         tweetText: String,
         authorUsername: String?,
         outputLanguage: AppLanguage,
-        model: String
+        model: String,
+        existingFolders: [String] = []
     ) async throws -> GrokPayload {
         let languageInstruction: String = switch outputLanguage {
         case .english: "Respond in English."
         case .simplifiedChinese: "用简体中文回答。"
         case .system: "Match the language of the tweet when possible; otherwise use Simplified Chinese."
+        }
+
+        let folderHint: String
+        if existingFolders.isEmpty {
+            folderHint = "Create a short reusable category folder label; avoid vague labels like Inbox/Misc."
+        } else {
+            let listed = existingFolders.prefix(40).joined(separator: ", ")
+            folderHint = """
+            Prefer an existing folder when it fits: \(listed).
+            If none fit, invent a NEW short category so folders grow with content.
+            """
         }
 
         let authorLine = authorUsername.map { "Author: @\($0)\n" } ?? ""
@@ -111,6 +123,7 @@ actor XWebSessionClient {
         \(tweetText)
 
         \(languageInstruction)
+        \(folderHint)
         Return JSON only with keys title, summary, category, tags.
         title must be concise; tags must contain 1-5 short reusable tags.
         """

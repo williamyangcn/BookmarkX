@@ -8,7 +8,6 @@ struct BookmarkDetailView: View {
 
     @State private var noteDraft: String = ""
     @State private var didLoadNote = false
-    @State private var showDeleteConfirm = false
     @State private var showWebPreview = true
 
     private var postURL: URL {
@@ -43,107 +42,63 @@ struct BookmarkDetailView: View {
             showWebPreview = true
             appModel.scheduleAutoRead(for: item.tweetID)
         }
-        .confirmationDialog(
-            "bookmarks.delete.title",
-            isPresented: $showDeleteConfirm,
-            titleVisibility: .visible
-        ) {
-            Button("bookmarks.delete.localOnly", role: .destructive) {
-                Task { await appModel.deleteBookmark(tweetID: item.tweetID, alsoFromX: false) }
-            }
-            Button("bookmarks.delete.localAndX", role: .destructive) {
-                Task { await appModel.deleteBookmark(tweetID: item.tweetID, alsoFromX: true) }
-            }
-            Button("action.cancel", role: .cancel) {}
-        } message: {
-            Text("bookmarks.delete.message")
-        }
     }
 
     private var headerBar: some View {
         VStack(alignment: .leading, spacing: 10) {
-            HStack(spacing: 10) {
+            HStack(spacing: 8) {
                 Text(displayTitle)
-                    .font(.title3.weight(.semibold))
-                    .lineLimit(2)
-                Spacer()
-                Button {
-                    showWebPreview.toggle()
-                } label: {
-                    Label(
-                        showWebPreview ? "detail.showMetadata" : "detail.showPreview",
-                        systemImage: showWebPreview ? "doc.plaintext" : "globe"
-                    )
-                }
-                .buttonStyle(.bordered)
+                    .font(.headline.weight(.semibold))
+                    .lineLimit(1)
+                Spacer(minLength: 8)
 
-                Link(destination: postURL) {
-                    Label("detail.openOnX", systemImage: "arrow.up.right.square")
+                HStack(spacing: 0) {
+                    Button {
+                        showWebPreview.toggle()
+                    } label: {
+                        Image(systemName: showWebPreview ? "doc.plaintext" : "globe")
+                            .frame(width: 30, height: 28)
+                    }
+                    .help(Text(showWebPreview ? "detail.showMetadata" : "detail.showPreview"))
+
+                    detailPillDivider
+
+                    Link(destination: postURL) {
+                        Image(systemName: "arrow.up.right.square")
+                            .frame(width: 30, height: 28)
+                    }
+                    .help(Text("detail.openOnX"))
                 }
-                .buttonStyle(.bordered)
+                .buttonStyle(.plain)
+                .padding(.horizontal, 4)
+                .background(
+                    Capsule(style: .continuous)
+                        .fill(Color.primary.opacity(0.06))
+                )
             }
 
             HStack(spacing: 10) {
                 authorAvatar
                 VStack(alignment: .leading, spacing: 2) {
                     Text(item.authorName)
-                        .font(.headline)
+                        .font(.subheadline.weight(.semibold))
                     Text("@\(item.authorUsername)")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
                 Spacer()
-                actionButtons
             }
         }
-        .padding(16)
+        .padding(.horizontal, 14)
+        .padding(.vertical, 10)
+        .background(.bar)
     }
 
-    private var actionButtons: some View {
-        HStack(spacing: 6) {
-            Button {
-                Task { await appModel.setRead(tweetID: item.tweetID, isRead: !item.isRead) }
-            } label: {
-                Image(systemName: item.isRead ? "envelope.badge" : "envelope.open")
-            }
-            .help(Text(item.isRead ? "bookmarks.markUnread" : "bookmarks.markRead"))
-
-            Button {
-                Task { await appModel.setFavorite(tweetID: item.tweetID, isFavorite: !item.isFavorite) }
-            } label: {
-                Image(systemName: item.isFavorite ? "star.fill" : "star")
-                    .foregroundStyle(item.isFavorite ? .yellow : .primary)
-            }
-            .help(Text(item.isFavorite ? "bookmarks.unfavorite" : "bookmarks.favorite"))
-
-            Menu {
-                ForEach(BookmarkImportance.allCases) { level in
-                    Button {
-                        Task { await appModel.setImportance(tweetID: item.tweetID, importance: level) }
-                    } label: {
-                        Label(level.titleKey, systemImage: level.systemImage)
-                    }
-                }
-            } label: {
-                Image(systemName: "exclamationmark.circle")
-            }
-            .help(Text("bookmarks.importance"))
-
-            Button {
-                Task { await appModel.setArchived(tweetID: item.tweetID, isArchived: !item.isArchived) }
-            } label: {
-                Image(systemName: "archivebox")
-            }
-            .help(Text(item.isArchived ? "bookmarks.unarchive" : "bookmarks.archive"))
-
-            Button(role: .destructive) {
-                showDeleteConfirm = true
-            } label: {
-                Image(systemName: "trash")
-            }
-            .help(Text("bookmarks.delete.local"))
-        }
-        .buttonStyle(.borderless)
+    private var detailPillDivider: some View {
+        Rectangle()
+            .fill(Color.primary.opacity(0.12))
+            .frame(width: 1, height: 14)
+            .padding(.horizontal, 2)
     }
 
     private var metadataScroll: some View {
@@ -255,10 +210,15 @@ struct BookmarkDetailView: View {
 
     private var displayTitle: String {
         if let title = item.title?.trimmingCharacters(in: .whitespacesAndNewlines),
-           !title.isEmpty {
+           !title.isEmpty,
+           !LocalBookmarkClassifier.isWeakTitle(title) {
             return title
         }
-        return String(item.text.prefix(80))
+        return LocalBookmarkClassifier.makeTitle(
+            text: item.text,
+            authorUsername: item.authorUsername,
+            hasMedia: item.mediaCount > 0
+        )
     }
 }
 

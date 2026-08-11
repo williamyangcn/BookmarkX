@@ -165,6 +165,24 @@ struct SettingsView: View {
                     }
                 }
                 .disabled(appModel.isSyncing || !appModel.connectionStatus.isXConnected)
+
+                Button {
+                    Task {
+                        await appModel.reclassifyAllBookmarks()
+                        statusMessage = appModel.syncStatusMessage
+                    }
+                } label: {
+                    if appModel.isEnriching {
+                        HStack {
+                            ProgressView()
+                                .controlSize(.small)
+                            Text("enrichment.status.running")
+                        }
+                    } else {
+                        Text("settings.reclassifyAll")
+                    }
+                }
+                .disabled(appModel.isEnriching || appModel.isSyncing)
             } header: {
                 Text("settings.sync")
             } footer: {

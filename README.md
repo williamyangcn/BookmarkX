@@ -20,6 +20,8 @@ Local-first macOS app for X (Twitter) bookmarks — sync, organize, search, and 
   </a>
 </p>
 
+**Latest:** [v0.2.0](https://github.com/williamyangcn/BookmarkX/releases/tag/v0.2.0) · [Download `BookmarkX-0.2.0.dmg`](https://github.com/williamyangcn/BookmarkX/releases/latest)
+
 ### Screenshots / 截图
 
 | English | 中文 |
@@ -40,14 +42,19 @@ Local-first macOS app for X (Twitter) bookmarks — sync, organize, search, and 
 
 | Package | Link |
 | --- | --- |
-| **Latest DMG** | [Download from GitHub Releases](https://github.com/williamyangcn/BookmarkX/releases/latest) |
+| **v0.2.0 DMG** | [Download `BookmarkX-0.2.0.dmg`](https://github.com/williamyangcn/BookmarkX/releases/latest) |
 | All versions | [Releases page](https://github.com/williamyangcn/BookmarkX/releases) |
 
 1. Open the `.dmg` and drag **BookmarkX** into **Applications**.
 2. On first launch, macOS may ask you to allow an unsigned/ad-hoc build: **System Settings → Privacy & Security → Open Anyway**.
 3. Sign in with X inside the app, then click **Refresh** to sync bookmarks.
 
-> If the latest release has no DMG asset yet, build one locally with `./Scripts/package-dmg.sh` (see below), or wait for the next published release.
+### What’s new in 0.2.0
+
+- Smart folders that grow from content (not a fixed short list); one-shot rebuild for the whole library
+- Column chrome: search + selection actions on the list column; preview column stays separate
+- Better titles for link-only posts (`链接分享 · @user`) and auto-repair of weak / placeholder titles
+- Unread / folder unread badges; Archive shows total count (no unread styling inside Archive)
 
 ### What it does
 
@@ -55,8 +62,8 @@ Local-first macOS app for X (Twitter) bookmarks — sync, organize, search, and 
 - Four-column layout: shortcuts · folders · list · X post preview
 - Unread workflow: read after 30s (font thins, count updates); next time you open Unread, read items move to Archive
 - Group list by post time: Today / Yesterday / 7 days / 15 days / 1 month / This year / Last year…
-- Importance, favorites, archive, delete (local or local + X)
-- Grok enrichment: title, summary, category folder, tags (Premium quota, API key, or Auto)
+- Importance, favorites, archive, delete (local or local + X) as list-column toolbar buttons (context menu still available)
+- Grok enrichment: title, summary, category folder, tags (Premium quota, API key, or Auto) — local classifier fallback can invent / reuse folders
 - Full-text search (FTS5)
 - UI languages: English and Simplified Chinese
 
@@ -85,7 +92,7 @@ xcodebuild -scheme BookmarkX -destination 'platform=macOS' test
 ```bash
 export DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer
 ./Scripts/package-dmg.sh          # → dist/BookmarkX-<version>.dmg
-./Scripts/package-dmg.sh 0.1.0    # optional version tag
+./Scripts/package-dmg.sh 0.2.0    # optional version tag
 ```
 
 Upload the DMG on [GitHub Releases](https://github.com/williamyangcn/BookmarkX/releases/new) so the Download badge above points at a real file.
@@ -115,14 +122,19 @@ Upload the DMG on [GitHub Releases](https://github.com/williamyangcn/BookmarkX/r
 
 | 安装包 | 链接 |
 | --- | --- |
-| **最新 DMG** | [从 GitHub Releases 下载](https://github.com/williamyangcn/BookmarkX/releases/latest) |
+| **v0.2.0 DMG** | [下载 `BookmarkX-0.2.0.dmg`](https://github.com/williamyangcn/BookmarkX/releases/latest) |
 | 历史版本 | [Releases 页面](https://github.com/williamyangcn/BookmarkX/releases) |
 
 1. 打开 `.dmg`，把 **BookmarkX** 拖进 **应用程序**。
 2. 首次打开若被拦截：系统设置 → 隐私与安全性 → 仍要打开（当前为 ad-hoc 签名）。
 3. 在应用内用 X 登录，然后点 **刷新** 同步书签。
 
-> 若最新 Release 还没有 DMG 附件，可先用 `./Scripts/package-dmg.sh` 本地打包，或等下一版发布。
+### 0.2.0 更新
+
+- 文件夹可按内容智能扩展（不再死守少数几个分类）；支持整库重建文件夹
+- 第三栏顶栏：搜索 + 选中书签操作按钮；第四栏预览独立顶栏
+- 纯链接帖标题改为「链接分享 · @用户」；自动修复 `X Bookmark` 等弱标题
+- Unread / 各文件夹显示未读数；Archive 显示归档总数（归档列表内不再强调未读样式）
 
 ### 功能
 
@@ -130,8 +142,8 @@ Upload the DMG on [GitHub Releases](https://github.com/williamyangcn/BookmarkX/r
 - 四栏界面：快捷方式 · 文件夹 · 列表 · X 帖子预览
 - 未读流程：预览约 30 秒标为已读（字体变细、角标变化）；再次进入「未读」时，已读自动进入归档
 - 按发帖时间分组：今天 / 昨天 / 7 天内 / 15 天内 / 1 个月内 / 今年 / 去年…
-- 重要程度、收藏、归档、删除（仅本地或本地+X）
-- Grok 整理：标题、摘要、分类文件夹、标签（Premium 额度 / API Key / 自动）
+- 重要程度、收藏、归档、删除（仅本地或本地+X）；列表顶栏按钮 + 右键菜单
+- Grok 整理：标题、摘要、分类文件夹、标签（Premium 额度 / API Key / 自动）；本地分类器可复用或新建文件夹
 - FTS5 全文搜索
 - 界面语言：简体中文、English
 
@@ -160,7 +172,7 @@ xcodebuild -scheme BookmarkX -destination 'platform=macOS' test
 ```bash
 export DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer
 ./Scripts/package-dmg.sh          # 输出 dist/BookmarkX-<version>.dmg
-./Scripts/package-dmg.sh 0.1.0    # 可指定版本号
+./Scripts/package-dmg.sh 0.2.0    # 可指定版本号
 ```
 
 把生成的 DMG 上传到 [GitHub Releases](https://github.com/williamyangcn/BookmarkX/releases/new)，上方下载按钮即可指向真实安装包。

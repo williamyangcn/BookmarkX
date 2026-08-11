@@ -5,8 +5,6 @@ struct MainSplitView: View {
     @State private var columnVisibility = NavigationSplitViewVisibility.all
 
     var body: some View {
-        @Bindable var model = appModel
-
         NavigationSplitView(columnVisibility: $columnVisibility) {
             HStack(spacing: 0) {
                 ShortcutRailView()
@@ -32,7 +30,7 @@ struct MainSplitView: View {
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .navigationSplitViewColumnWidth(min: 300, ideal: 380, max: 520)
+            .navigationSplitViewColumnWidth(min: 320, ideal: 400, max: 560)
         } detail: {
             Group {
                 if appModel.selectedSidebarItem.showsBookmarkList,
@@ -75,7 +73,6 @@ struct MainSplitView: View {
                 .background(.orange.opacity(0.12))
             }
         }
-        .searchable(text: $model.searchText, prompt: Text("search.prompt"))
         .onChange(of: appModel.searchText) { _, newValue in
             Task {
                 try? await appModel.bookmarkStore?.reload(searchText: newValue)
@@ -83,45 +80,6 @@ struct MainSplitView: View {
         }
         .onChange(of: appModel.selectedBookmarkID) { _, newValue in
             appModel.scheduleAutoRead(for: newValue)
-        }
-        .toolbar {
-            ToolbarItem(placement: .status) {
-                if appModel.isSyncing || appModel.isEnriching {
-                    HStack(spacing: 8) {
-                        ProgressView()
-                            .controlSize(.small)
-                        if appModel.isSyncing {
-                            Text("sync.status.running")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                        } else {
-                            Text("enrichment.status.running")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                        }
-                    }
-                } else if let message = appModel.syncStatusMessage {
-                    Text(message)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
-                }
-            }
-
-            ToolbarItemGroup {
-                Button {
-                    Task { await appModel.refreshBookmarks() }
-                } label: {
-                    if appModel.isSyncing || appModel.isEnriching {
-                        ProgressView()
-                            .controlSize(.small)
-                    } else {
-                        Label("action.refresh", systemImage: "arrow.clockwise")
-                    }
-                }
-                .disabled(appModel.isSyncing || appModel.isEnriching)
-                .help("action.refresh.help")
-            }
         }
     }
 }
@@ -153,9 +111,6 @@ private struct ShortcutRailView: View {
             }
 
             Spacer(minLength: 0)
-
-            ConnectionBadge()
-                .padding(.bottom, 8)
         }
         .padding(.vertical, 14)
         .padding(.horizontal, 12)
@@ -257,20 +212,5 @@ private struct UnreadBadge: View {
             .padding(.horizontal, 7)
             .padding(.vertical, 2)
             .background(color, in: Capsule())
-    }
-}
-
-private struct ConnectionBadge: View {
-    @Environment(AppModel.self) private var appModel
-
-    var body: some View {
-        VStack(spacing: 6) {
-            Image(systemName: appModel.connectionStatus.isXConnected ? "checkmark.circle.fill" : "xmark.circle")
-                .foregroundStyle(appModel.connectionStatus.isXConnected ? .green : .secondary)
-            Image(systemName: "sparkles")
-                .foregroundStyle(appModel.connectionStatus.isGrokConfigured ? .green : .secondary)
-        }
-        .font(.caption)
-        .help(Text(appModel.connectionStatus.isXConnected ? "status.xConnected" : "status.xDisconnected"))
     }
 }
