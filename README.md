@@ -20,9 +20,19 @@ Local-first macOS app for X (Twitter) bookmarks — sync, organize, search, and 
   </a>
 </p>
 
+### Screenshots / 截图
+
+| English | 中文 |
+| :---: | :---: |
+| ![BookmarkX English UI](Docs/screenshots/app-en.png) | ![BookmarkX 中文界面](Docs/screenshots/app-zh-Hans.png) |
+
 ---
 
 ## English
+
+### Screenshots
+
+![BookmarkX — English](Docs/screenshots/app-en.png)
 
 ### Download
 
@@ -94,6 +104,10 @@ Upload the DMG on [GitHub Releases](https://github.com/williamyangcn/BookmarkX/r
 ---
 
 ## 中文
+
+### 截图
+
+![BookmarkX — 中文界面](Docs/screenshots/app-zh-Hans.png)
 
 ### 下载
 
