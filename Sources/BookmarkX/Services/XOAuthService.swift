@@ -358,34 +358,32 @@ enum XOAuthError: LocalizedError, Equatable {
     var errorDescription: String? {
         switch self {
         case .missingClientID:
-            String(localized: "oauth.error.missingClientID")
+            AppLocalization.text("oauth.error.missingClientID")
         case .invalidAuthorizationURL, .invalidTokenURL, .invalidUserURL:
-            String(localized: "oauth.error.invalidURL")
+            AppLocalization.text("oauth.error.invalidURL")
         case .couldNotStartSession:
-            String(localized: "oauth.error.couldNotStart")
+            AppLocalization.text("oauth.error.couldNotStart")
         case .cancelled:
-            String(localized: "oauth.error.cancelled")
+            AppLocalization.text("oauth.error.cancelled")
         case .missingCallback, .invalidCallback:
-            String(localized: "oauth.error.invalidCallback")
+            AppLocalization.text("oauth.error.invalidCallback")
         case .authorizationDenied(let message):
-            String(
-                format: String(localized: "oauth.error.deniedFormat"),
-                message
+            AppLocalization.format("oauth.error.deniedFormat", message
             )
         case .stateMismatch:
-            String(localized: "oauth.error.stateMismatch")
+            AppLocalization.text("oauth.error.stateMismatch")
         case .missingAuthorizationCode:
-            String(localized: "oauth.error.missingCode")
+            AppLocalization.text("oauth.error.missingCode")
         case .randomGenerationFailed(let status):
-            "Secure random generation failed: \(status)"
+            AppLocalization.format("oauth.error.randomFailedFormat", status)
         case .invalidHTTPResponse:
-            String(localized: "oauth.error.invalidResponse")
+            AppLocalization.text("oauth.error.invalidResponse")
         case .server(let statusCode, let message):
-            "X API \(statusCode): \(message)"
+            AppLocalization.format("oauth.error.serverFormat", statusCode, message)
         case .invalidTokenResponse:
-            String(localized: "oauth.error.invalidToken")
+            AppLocalization.text("oauth.error.invalidToken")
         case .invalidUserResponse:
-            String(localized: "oauth.error.invalidUser")
+            AppLocalization.text("oauth.error.invalidUser")
         }
     }
 }

@@ -175,13 +175,13 @@ enum XAPIError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .notConfigured:
-            String(localized: "sync.error.notConfigured")
+            AppLocalization.text("sync.error.notConfigured")
         case .invalidURL:
-            String(localized: "sync.error.invalidURL")
+            AppLocalization.text("sync.error.invalidURL")
         case .invalidResponse:
-            String(localized: "sync.error.invalidResponse")
+            AppLocalization.text("sync.error.invalidResponse")
         case .server(let statusCode, let message):
-            "X API \(statusCode): \(message)"
+            AppLocalization.format("oauth.error.serverFormat", statusCode, message)
         }
     }
 }

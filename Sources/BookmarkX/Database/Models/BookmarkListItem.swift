@@ -90,19 +90,19 @@ enum BookmarkTimeGroup: Hashable, Comparable, Sendable {
     var title: String {
         switch self {
         case .today:
-            String(localized: "bookmarks.section.today")
+            AppLocalization.text("bookmarks.section.today")
         case .yesterday:
-            String(localized: "bookmarks.section.yesterday")
+            AppLocalization.text("bookmarks.section.yesterday")
         case .last7Days:
-            String(localized: "bookmarks.section.last7Days")
+            AppLocalization.text("bookmarks.section.last7Days")
         case .last15Days:
-            String(localized: "bookmarks.section.last15Days")
+            AppLocalization.text("bookmarks.section.last15Days")
         case .lastMonth:
-            String(localized: "bookmarks.section.lastMonth")
+            AppLocalization.text("bookmarks.section.lastMonth")
         case .thisYear:
-            String(localized: "bookmarks.section.thisYear")
+            AppLocalization.text("bookmarks.section.thisYear")
         case .lastYear:
-            String(localized: "bookmarks.section.lastYear")
+            AppLocalization.text("bookmarks.section.lastYear")
         case .year(let year):
             String(year)
         }

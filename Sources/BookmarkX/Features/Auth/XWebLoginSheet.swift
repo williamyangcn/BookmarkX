@@ -7,7 +7,7 @@ struct XWebLoginSheet: View {
 
     @Environment(\.dismiss) private var dismiss
     @State private var isChecking = false
-    @State private var statusText = String(localized: "auth.session.waiting")
+    @State private var statusText = AppLocalization.text("auth.session.waiting")
     @State private var canContinue = false
     @State private var pendingSession: XWebSession?
 
@@ -142,7 +142,7 @@ private struct XLoginWebView: NSViewRepresentable {
 
             // Prefer same-window navigation for Google / Apple SSO — most reliable.
             if let url, isExternalSSOHost(url) {
-                parent.statusText = String(localized: "auth.session.finishGoogle")
+                parent.statusText = AppLocalization.text("auth.session.finishGoogle")
                 self.webView?.load(URLRequest(url: url))
                 return nil
             }
@@ -173,7 +173,7 @@ private struct XLoginWebView: NSViewRepresentable {
                 backing: .buffered,
                 defer: false
             )
-            window.title = String(localized: "auth.session.popupTitle")
+            window.title = AppLocalization.text("auth.session.popupTitle")
             window.contentView = popup
             window.isReleasedWhenClosed = false
             window.delegate = self
@@ -181,7 +181,7 @@ private struct XLoginWebView: NSViewRepresentable {
             window.makeKeyAndOrderFront(nil)
             popupWindow = window
 
-            parent.statusText = String(localized: "auth.session.finishGoogle")
+            parent.statusText = AppLocalization.text("auth.session.finishGoogle")
             // Do NOT call popup.load here — WebKit loads navigationAction into the returned view.
             return popup
         }
@@ -204,10 +204,10 @@ private struct XLoginWebView: NSViewRepresentable {
         ) {
             if let url = navigationAction.request.url {
                 if isExternalSSOHost(url) {
-                    parent.statusText = String(localized: "auth.session.finishGoogle")
+                    parent.statusText = AppLocalization.text("auth.session.finishGoogle")
                 } else if isXHost(url) {
                     // Returning from Google/Apple into X — keep polling.
-                    parent.statusText = String(localized: "auth.session.verifying")
+                    parent.statusText = AppLocalization.text("auth.session.verifying")
                 }
             }
             decisionHandler(.allow)
@@ -286,7 +286,7 @@ private struct XLoginWebView: NSViewRepresentable {
                 return
             }
 
-            parent.statusText = String(localized: "auth.session.verifying")
+            parent.statusText = AppLocalization.text("auth.session.verifying")
             var session = XWebSession(authToken: auth, ct0: ct0, userID: twidUserID)
 
             if let verified = try? await XWebSessionClient().verify(session: session) {
@@ -304,7 +304,7 @@ private struct XLoginWebView: NSViewRepresentable {
             parent.pendingSession = session
             parent.canContinue = true
             parent.isChecking = false
-            parent.statusText = String(localized: "auth.session.readyToContinue")
+            parent.statusText = AppLocalization.text("auth.session.readyToContinue")
 
             if autoComplete {
                 didFinish = true
@@ -337,7 +337,7 @@ private struct XLoginWebView: NSViewRepresentable {
             })();
             """
             if let result = try? await webView.evaluateJavaScript(js) as? String, result == "blocked" {
-                parent.statusText = String(localized: "auth.session.googleBlocked")
+                parent.statusText = AppLocalization.text("auth.session.googleBlocked")
             }
         }
 

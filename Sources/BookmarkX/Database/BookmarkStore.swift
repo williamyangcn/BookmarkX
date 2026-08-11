@@ -312,14 +312,48 @@ enum BookmarkQueries {
     }
 
     static func moveBookmark(db: Database, tweetID: String, toFolderID folderID: String?) throws {
+        let now = Date()
         try db.execute(
             sql: """
             UPDATE bookmarks
             SET folder_id = ?, is_archived = ?, updated_at = ?
             WHERE tweet_id = ?
             """,
-            arguments: [folderID, folderID != nil, Date(), tweetID]
+            arguments: [folderID, folderID != nil, now, tweetID]
         )
+
+        // Manual folder choice wins over future AI/local auto-classification.
+        let folderName: String?
+        if let folderID {
+            folderName = try String.fetchOne(
+                db,
+                sql: "SELECT name FROM folders WHERE id = ? LIMIT 1",
+                arguments: [folderID]
+            )
+        } else {
+            folderName = nil
+        }
+
+        if var existing = try AIResult.fetchOne(db, key: tweetID) {
+            existing.category = folderName
+            existing.isCategoryManual = true
+            existing.updatedAt = now
+            try existing.save(db)
+        } else {
+            let result = AIResult(
+                tweetID: tweetID,
+                title: nil,
+                summary: nil,
+                category: folderName,
+                model: "manual",
+                isSummaryManual: false,
+                isCategoryManual: true,
+                processedAt: now,
+                updatedAt: now
+            )
+            try result.insert(db)
+        }
+        try refreshSearchIndex(db: db, tweetID: tweetID)
     }
 
     static func updateNote(db: Database, tweetID: String, note: String?) throws {

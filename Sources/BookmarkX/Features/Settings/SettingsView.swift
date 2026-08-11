@@ -16,7 +16,7 @@ struct SettingsView: View {
             Section {
                 if appModel.connectionStatus.isXConnected {
                     LabeledContent("settings.xAccount") {
-                        Text(appModel.connectionStatus.xUsername.map { "@\($0)" } ?? String(localized: "status.xConnected"))
+                        Text(appModel.connectionStatus.xUsername.map { "@\($0)" } ?? AppLocalization.text("status.xConnected"))
                     }
 
                     Text("auth.signedInBenefits")
@@ -25,7 +25,7 @@ struct SettingsView: View {
 
                     Button("settings.disconnectX", role: .destructive) {
                         appModel.signOutX()
-                        statusMessage = String(localized: "settings.xDisconnected")
+                        statusMessage = AppLocalization.text("settings.xDisconnected")
                     }
                 } else {
                     VStack(alignment: .leading, spacing: 12) {
@@ -47,7 +47,7 @@ struct SettingsView: View {
                         } else {
                             Button("auth.browserLogin.needsClientID") {
                                 showAdvanced = true
-                                statusMessage = String(localized: "auth.clientID.required")
+                                statusMessage = AppLocalization.text("auth.clientID.required")
                             }
                             .buttonStyle(.link)
                         }
@@ -141,11 +141,7 @@ struct SettingsView: View {
             Section {
                 Stepper(value: $settings.syncBatchSize, in: 1...100) {
                     Text(
-                        String(
-                            format: String(localized: "settings.syncBatchSizeFormat"),
-                            locale: .current,
-                            settings.syncBatchSize
-                        )
+                        AppLocalization.format("settings.syncBatchSizeFormat", settings.syncBatchSize)
                     )
                 }
                 Toggle("settings.syncSkipAlreadySynced", isOn: $settings.syncSkipAlreadySynced)
@@ -196,7 +192,7 @@ struct SettingsView: View {
                 Button("settings.clearCredentials", role: .destructive) {
                     try? KeychainStore.shared.clearAll()
                     refreshGrokState()
-                    statusMessage = String(localized: "settings.credentialsCleared")
+                    statusMessage = AppLocalization.text("settings.credentialsCleared")
                 }
             }
 
@@ -209,8 +205,8 @@ struct SettingsView: View {
             }
         }
         .formStyle(.grouped)
-        .padding()
-        .navigationTitle("sidebar.settings")
+        .padding(.horizontal, 8)
+        .padding(.vertical, 4)
         .onAppear {
             grokAPIKeyDraft = (try? KeychainStore.shared.load(.grokAPIKey)) ?? ""
             showAdvanced = settings.xClientID.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
@@ -238,7 +234,7 @@ struct SettingsView: View {
         do {
             try KeychainStore.shared.save(key, for: .grokAPIKey)
             refreshGrokState()
-            statusMessage = String(localized: "settings.grokSaved")
+            statusMessage = AppLocalization.text("settings.grokSaved")
         } catch {
             statusMessage = error.localizedDescription
         }
@@ -249,18 +245,18 @@ struct SettingsView: View {
         case .success(let session):
             switch await appModel.completeWebSignIn(session) {
             case .signedIn(let username):
-                statusMessage = String(format: String(localized: "settings.xConnectedAsFormat"), username)
+                statusMessage = AppLocalization.format("settings.xConnectedAsFormat", username)
             case .cancelled:
-                statusMessage = String(localized: "oauth.error.cancelled")
+                statusMessage = AppLocalization.text("oauth.error.cancelled")
             case .missingClientID:
                 showAdvanced = true
-                statusMessage = String(localized: "auth.clientID.required")
+                statusMessage = AppLocalization.text("auth.clientID.required")
             case .failed(let message):
                 statusMessage = message
             }
         case .failure(let error):
             if let oauthError = error as? XOAuthError, oauthError == .cancelled {
-                statusMessage = String(localized: "oauth.error.cancelled")
+                statusMessage = AppLocalization.text("oauth.error.cancelled")
             } else {
                 statusMessage = error.localizedDescription
             }
@@ -275,18 +271,18 @@ struct SettingsView: View {
         }
 
         isSigningIn = true
-        statusMessage = String(localized: "auth.browserLogin.opening")
+        statusMessage = AppLocalization.text("auth.browserLogin.opening")
         defer { isSigningIn = false }
 
         switch await appModel.signInWithXInBrowser() {
         case .signedIn(let username):
-            statusMessage = String(format: String(localized: "settings.xConnectedAsFormat"), username)
+            statusMessage = AppLocalization.format("settings.xConnectedAsFormat", username)
         case .cancelled:
-            statusMessage = String(localized: "oauth.error.cancelled")
+            statusMessage = AppLocalization.text("oauth.error.cancelled")
         case .missingClientID:
             showAdvanced = true
             showEmbeddedLogin = true
-            statusMessage = String(localized: "auth.clientID.required")
+            statusMessage = AppLocalization.text("auth.clientID.required")
         case .failed(let message):
             statusMessage = message
         }
@@ -305,9 +301,7 @@ struct SettingsView: View {
                 text: "BookmarkX helps organize X bookmarks with Grok summaries, categories, and tags.",
                 authorUsername: "bookmarkx"
             )
-            statusMessage = String(
-                format: String(localized: "settings.grokTestSuccessFormat"),
-                result.provider.rawValue,
+            statusMessage = AppLocalization.format("settings.grokTestSuccessFormat", result.provider.rawValue,
                 result.category,
                 result.summary
             )

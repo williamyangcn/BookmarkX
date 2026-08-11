@@ -24,24 +24,24 @@ enum GrokError: LocalizedError {
         case .notConfigured(let mode):
             switch mode {
             case .xPremium:
-                String(localized: "grok.error.premiumNotReady")
+                AppLocalization.text("grok.error.premiumNotReady")
             case .apiKey:
-                String(localized: "grok.error.apiKeyMissing")
+                AppLocalization.text("grok.error.apiKeyMissing")
             case .auto:
-                String(localized: "grok.error.autoNotReady")
+                AppLocalization.text("grok.error.autoNotReady")
             }
         case .premiumRequiresX:
-            String(localized: "grok.error.premiumRequiresX")
+            AppLocalization.text("grok.error.premiumRequiresX")
         case .apiKeyMissing:
-            String(localized: "grok.error.apiKeyMissing")
+            AppLocalization.text("grok.error.apiKeyMissing")
         case .invalidResponse:
-            String(localized: "grok.error.invalidResponse")
+            AppLocalization.text("grok.error.invalidResponse")
         case .server(let statusCode, let message):
-            "Grok \(statusCode): \(message)"
+            AppLocalization.format("grok.error.serverFormat", statusCode, message)
         case .decodingFailed:
-            String(localized: "grok.error.decodingFailed")
+            AppLocalization.text("grok.error.decodingFailed")
         case .emptyContent:
-            String(localized: "grok.error.emptyContent")
+            AppLocalization.text("grok.error.emptyContent")
         case .premiumUnavailable(let message):
             message
         }

@@ -20,7 +20,7 @@ Local-first macOS app for X (Twitter) bookmarks — sync, organize, search, and 
   </a>
 </p>
 
-**Latest:** [v0.2.0](https://github.com/williamyangcn/BookmarkX/releases/tag/v0.2.0) · [Download `BookmarkX-0.2.0.dmg`](https://github.com/williamyangcn/BookmarkX/releases/latest)
+**Latest:** [v0.2.1](https://github.com/williamyangcn/BookmarkX/releases/tag/v0.2.1) · [Download `BookmarkX-0.2.1.dmg`](https://github.com/williamyangcn/BookmarkX/releases/latest)
 
 ### Screenshots / 截图
 
@@ -42,12 +42,18 @@ Local-first macOS app for X (Twitter) bookmarks — sync, organize, search, and 
 
 | Package | Link |
 | --- | --- |
-| **v0.2.0 DMG** | [Download `BookmarkX-0.2.0.dmg`](https://github.com/williamyangcn/BookmarkX/releases/latest) |
+| **v0.2.1 DMG** | [Download `BookmarkX-0.2.1.dmg`](https://github.com/williamyangcn/BookmarkX/releases/latest) |
 | All versions | [Releases page](https://github.com/williamyangcn/BookmarkX/releases) |
 
 1. Open the `.dmg` and drag **BookmarkX** into **Applications**.
 2. On first launch, macOS may ask you to allow an unsigned/ad-hoc build: **System Settings → Privacy & Security → Open Anyway**.
 3. Sign in with X inside the app, then click **Refresh** to sync bookmarks.
+
+### What’s new in 0.2.1
+
+- Settings opens in a separate macOS Settings window (no longer takes over the list column)
+- Manual **Move to Folder** (toolbar + context menu), including Uncategorized; manual picks are never overwritten by auto-classify
+- Chinese UI localization fixes (filter menu, status, relative time follow interface language)
 
 ### What’s new in 0.2.0
 
@@ -92,7 +98,7 @@ xcodebuild -scheme BookmarkX -destination 'platform=macOS' test
 ```bash
 export DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer
 ./Scripts/package-dmg.sh          # → dist/BookmarkX-<version>.dmg
-./Scripts/package-dmg.sh 0.2.0    # optional version tag
+./Scripts/package-dmg.sh 0.2.1    # optional version tag
 ```
 
 Upload the DMG on [GitHub Releases](https://github.com/williamyangcn/BookmarkX/releases/new) so the Download badge above points at a real file.
@@ -122,12 +128,18 @@ Upload the DMG on [GitHub Releases](https://github.com/williamyangcn/BookmarkX/r
 
 | 安装包 | 链接 |
 | --- | --- |
-| **v0.2.0 DMG** | [下载 `BookmarkX-0.2.0.dmg`](https://github.com/williamyangcn/BookmarkX/releases/latest) |
+| **v0.2.1 DMG** | [下载 `BookmarkX-0.2.1.dmg`](https://github.com/williamyangcn/BookmarkX/releases/latest) |
 | 历史版本 | [Releases 页面](https://github.com/williamyangcn/BookmarkX/releases) |
 
 1. 打开 `.dmg`，把 **BookmarkX** 拖进 **应用程序**。
 2. 首次打开若被拦截：系统设置 → 隐私与安全性 → 仍要打开（当前为 ad-hoc 签名）。
 3. 在应用内用 X 登录，然后点 **刷新** 同步书签。
+
+### 0.2.1 更新
+
+- 设置改为独立系统设置窗口，不再占用第三栏
+- 支持手工「移动到文件夹」（顶栏 + 右键），含「未分类」；手工选择后自动分类不再覆盖
+- 中文界面本地化修复（筛选菜单、状态、相对时间跟随界面语言）
 
 ### 0.2.0 更新
 
@@ -172,7 +184,7 @@ xcodebuild -scheme BookmarkX -destination 'platform=macOS' test
 ```bash
 export DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer
 ./Scripts/package-dmg.sh          # 输出 dist/BookmarkX-<version>.dmg
-./Scripts/package-dmg.sh 0.2.0    # 可指定版本号
+./Scripts/package-dmg.sh 0.2.1    # 可指定版本号
 ```
 
 把生成的 DMG 上传到 [GitHub Releases](https://github.com/williamyangcn/BookmarkX/releases/new)，上方下载按钮即可指向真实安装包。

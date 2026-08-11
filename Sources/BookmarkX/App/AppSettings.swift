@@ -19,7 +19,10 @@ final class AppSettings {
     static let currentFolderTaxonomyVersion = 2
 
     var interfaceLanguage: AppLanguage {
-        didSet { UserDefaults.standard.set(interfaceLanguage.rawValue, forKey: Keys.interfaceLanguage) }
+        didSet {
+            UserDefaults.standard.set(interfaceLanguage.rawValue, forKey: Keys.interfaceLanguage)
+            AppLocalization.sync(from: interfaceLanguage)
+        }
     }
 
     var aiOutputLanguage: AppLanguage {
@@ -80,7 +83,12 @@ final class AppSettings {
 
     init(defaults: UserDefaults = .standard) {
         let interfaceRaw = defaults.string(forKey: Keys.interfaceLanguage)
-        interfaceLanguage = AppLanguage(rawValue: interfaceRaw ?? "") ?? .system
+        // Prefer Simplified Chinese for the product UI when unset; keep explicit user choice.
+        if let interfaceRaw, let language = AppLanguage(rawValue: interfaceRaw) {
+            interfaceLanguage = language
+        } else {
+            interfaceLanguage = .simplifiedChinese
+        }
 
         let aiRaw = defaults.string(forKey: Keys.aiOutputLanguage)
         aiOutputLanguage = AppLanguage(rawValue: aiRaw ?? "") ?? .simplifiedChinese
@@ -103,6 +111,17 @@ final class AppSettings {
 
         syncDeleteFromXAfterSync = defaults.bool(forKey: Keys.syncDeleteFromXAfterSync)
         folderTaxonomyVersion = defaults.object(forKey: Keys.folderTaxonomyVersion) as? Int ?? 0
+
+        // One-time: if AI output is Chinese but UI was left on English, align UI language.
+        let didAlign = defaults.bool(forKey: "settings.didAlignUILanguageWithAI")
+        if !didAlign {
+            if aiOutputLanguage == .simplifiedChinese, interfaceLanguage == .english {
+                interfaceLanguage = .simplifiedChinese
+            }
+            defaults.set(true, forKey: "settings.didAlignUILanguageWithAI")
+        }
+
+        AppLocalization.sync(from: interfaceLanguage)
     }
 }
 

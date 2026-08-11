@@ -2,6 +2,7 @@ import SwiftUI
 
 struct BookmarkListView: View {
     @Environment(AppModel.self) private var appModel
+    @Environment(\.openSettings) private var openSettings
     @State private var pendingDeleteID: String?
     @State private var filterTab: ListFilterTab = .all
     @FocusState private var isSearchFocused: Bool
@@ -38,7 +39,7 @@ struct BookmarkListView: View {
                         Text("bookmarks.emptyDescription")
                     } actions: {
                         Button("onboarding.openSettings") {
-                            appModel.selectedSidebarItem = .settings
+                            openSettings()
                         }
                     }
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -128,7 +129,7 @@ struct BookmarkListView: View {
                                 filterTab = tab
                             } label: {
                                 HStack {
-                                    Text(tabTitle(tab))
+                                    filterLabel(tab)
                                     if filterTab == tab {
                                         Image(systemName: "checkmark")
                                     }
@@ -257,6 +258,20 @@ struct BookmarkListView: View {
 
             pillDivider
 
+            Menu {
+                moveToFolderMenu(for: selected)
+            } label: {
+                Image(systemName: "folder")
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundStyle(Color.primary.opacity(selected == nil ? 0.35 : 0.85))
+                    .frame(width: 30, height: 28)
+            }
+            .menuStyle(.borderlessButton)
+            .disabled(selected == nil)
+            .help(Text("bookmarks.moveToFolder"))
+
+            pillDivider
+
             actionIcon(
                 systemImage: "archivebox",
                 help: selected?.isArchived == true ? "bookmarks.unarchive" : "bookmarks.archive",
@@ -320,36 +335,35 @@ struct BookmarkListView: View {
         return appModel.bookmarkStore?.items.first(where: { $0.id == id })
     }
 
-    private var statusLine: String? {
-        if appModel.isSyncing {
-            return String(localized: "sync.status.running")
-        }
-        if appModel.isEnriching {
-            return String(localized: "enrichment.status.running")
-        }
-        return appModel.syncStatusMessage
-    }
-
-    private func tabTitle(_ tab: ListFilterTab) -> String {
+    @ViewBuilder
+    private func filterLabel(_ tab: ListFilterTab) -> some View {
         switch tab {
         case .all:
-            return String(localized: "bookmarks.filter.all")
+            Text("bookmarks.filter.all")
         case .unread:
-            let count = appModel.filteredBookmarks.filter { !$0.isRead }.count
-            return String(format: String(localized: "bookmarks.filter.unreadFormat"), locale: .current, count)
+            Text("bookmarks.filter.unreadFormat \(appModel.filteredBookmarks.filter { !$0.isRead }.count)")
         case .others:
-            let count = appModel.filteredBookmarks.filter(\.isRead).count
-            return String(format: String(localized: "bookmarks.filter.othersFormat"), locale: .current, count)
+            Text("bookmarks.filter.othersFormat \(appModel.filteredBookmarks.filter(\.isRead).count)")
         }
+    }
+
+    private var statusLine: String? {
+        if appModel.isSyncing {
+            return AppLocalization.text("sync.status.running")
+        }
+        if appModel.isEnriching {
+            return AppLocalization.text("enrichment.status.running")
+        }
+        return appModel.syncStatusMessage
     }
 
     private var listTitle: String {
         switch appModel.selectedSidebarItem {
         case .folder(let folderID):
             return appModel.bookmarkStore?.folders.first(where: { $0.id == folderID })?.name
-                ?? String(localized: "sidebar.folders")
+                ?? AppLocalization.text("sidebar.folders")
         default:
-            return String(localized: appModel.selectedSidebarItem.titleKey)
+            return AppLocalization.text(resource: appModel.selectedSidebarItem.titleKey)
         }
     }
 
@@ -415,6 +429,10 @@ struct BookmarkListView: View {
             }
         }
 
+        Menu("bookmarks.moveToFolder") {
+            moveToFolderMenu(for: item)
+        }
+
         Button {
             Task { await appModel.setArchived(tweetID: item.tweetID, isArchived: !item.isArchived) }
         } label: {
@@ -428,6 +446,42 @@ struct BookmarkListView: View {
 
         Button("bookmarks.delete.local", role: .destructive) {
             pendingDeleteID = item.id
+        }
+    }
+
+    @ViewBuilder
+    private func moveToFolderMenu(for item: BookmarkListItem?) -> some View {
+        let folders = appModel.bookmarkStore?.folders ?? []
+
+        Button {
+            guard let item else { return }
+            Task { await appModel.moveBookmark(tweetID: item.tweetID, toFolderID: nil) }
+        } label: {
+            HStack {
+                Text("sidebar.uncategorized")
+                if item?.folderID == nil {
+                    Image(systemName: "checkmark")
+                }
+            }
+        }
+        .disabled(item == nil)
+
+        if !folders.isEmpty {
+            Divider()
+            ForEach(folders) { folder in
+                Button {
+                    guard let item else { return }
+                    Task { await appModel.moveBookmark(tweetID: item.tweetID, toFolderID: folder.id) }
+                } label: {
+                    HStack {
+                        Text(folder.name)
+                        if item?.folderID == folder.id {
+                            Image(systemName: "checkmark")
+                        }
+                    }
+                }
+                .disabled(item == nil)
+            }
         }
     }
 }
@@ -455,7 +509,7 @@ private struct BookmarkRowView: View {
                         .lineLimit(1)
                     Spacer(minLength: 8)
                     importanceGlyph
-                    Text(relativeTime)
+                    Text(AppLocalization.relativeDate(item.postedAt))
                         .font(.caption2)
                         .foregroundStyle(.secondary)
                 }
@@ -562,9 +616,5 @@ private struct BookmarkRowView: View {
             return summary
         }
         return item.text
-    }
-
-    private var relativeTime: String {
-        item.postedAt.formatted(.relative(presentation: .named))
     }
 }

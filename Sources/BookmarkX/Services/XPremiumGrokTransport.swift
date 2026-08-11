@@ -50,9 +50,7 @@ struct XPremiumGrokTransport: Sendable {
             )
         } catch GrokError.server(let statusCode, let message) where [401, 403, 404].contains(statusCode) {
             throw GrokError.premiumUnavailable(
-                String(
-                    format: String(localized: "grok.error.premiumRejectedFormat"),
-                    "HTTP \(statusCode): \(message)"
+                AppLocalization.format("grok.error.premiumRejectedFormat", "HTTP \(statusCode): \(message)"
                 )
             )
         }

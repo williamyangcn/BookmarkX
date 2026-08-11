@@ -53,7 +53,7 @@ struct OnboardingView: View {
                 } else {
                     Button("auth.browserLogin.needsClientID") {
                         showClientID = true
-                        statusMessage = String(localized: "auth.clientID.required")
+                        statusMessage = AppLocalization.text("auth.clientID.required")
                     }
                     .buttonStyle(.link)
                 }
@@ -122,20 +122,20 @@ struct OnboardingView: View {
         case .success(let session):
             switch await appModel.completeWebSignIn(session) {
             case .signedIn(let username):
-                statusMessage = String(format: String(localized: "settings.xConnectedAsFormat"), username)
+                statusMessage = AppLocalization.format("settings.xConnectedAsFormat", username)
                 appModel.settings.hasCompletedOnboarding = true
                 appModel.selectedSidebarItem = .inbox
             case .cancelled:
-                statusMessage = String(localized: "oauth.error.cancelled")
+                statusMessage = AppLocalization.text("oauth.error.cancelled")
             case .missingClientID:
                 showClientID = true
-                statusMessage = String(localized: "auth.clientID.required")
+                statusMessage = AppLocalization.text("auth.clientID.required")
             case .failed(let message):
                 statusMessage = message
             }
         case .failure(let error):
             if let oauthError = error as? XOAuthError, oauthError == .cancelled {
-                statusMessage = String(localized: "oauth.error.cancelled")
+                statusMessage = AppLocalization.text("oauth.error.cancelled")
             } else {
                 statusMessage = error.localizedDescription
             }
@@ -155,20 +155,20 @@ struct OnboardingView: View {
         }
 
         isSigningIn = true
-        statusMessage = String(localized: "auth.browserLogin.opening")
+        statusMessage = AppLocalization.text("auth.browserLogin.opening")
         defer { isSigningIn = false }
 
         switch await appModel.signInWithXInBrowser() {
         case .signedIn(let username):
-            statusMessage = String(format: String(localized: "settings.xConnectedAsFormat"), username)
+            statusMessage = AppLocalization.format("settings.xConnectedAsFormat", username)
             appModel.settings.hasCompletedOnboarding = true
             appModel.selectedSidebarItem = .inbox
         case .cancelled:
-            statusMessage = String(localized: "oauth.error.cancelled")
+            statusMessage = AppLocalization.text("oauth.error.cancelled")
         case .missingClientID:
             showClientID = true
             showEmbeddedLogin = true
-            statusMessage = String(localized: "auth.clientID.required")
+            statusMessage = AppLocalization.text("auth.clientID.required")
         case .failed(let message):
             statusMessage = message
         }

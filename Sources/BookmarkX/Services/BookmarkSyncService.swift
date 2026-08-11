@@ -263,6 +263,6 @@ enum BookmarkSyncError: LocalizedError {
     case alreadyRunning
 
     var errorDescription: String? {
-        String(localized: "sync.error.alreadyRunning")
+        AppLocalization.text("sync.error.alreadyRunning")
     }
 }

@@ -2,6 +2,7 @@ import SwiftUI
 
 struct MainSplitView: View {
     @Environment(AppModel.self) private var appModel
+    @Environment(\.openSettings) private var openSettings
     @State private var columnVisibility = NavigationSplitViewVisibility.all
 
     var body: some View {
@@ -23,8 +24,6 @@ struct MainSplitView: View {
                 switch appModel.selectedSidebarItem {
                 case .tags:
                     TagListView()
-                case .settings:
-                    SettingsView()
                 default:
                     BookmarkListView()
                 }
@@ -64,13 +63,19 @@ struct MainSplitView: View {
                         .font(.callout)
                     Spacer()
                     Button("auth.banner.action") {
-                        appModel.selectedSidebarItem = .settings
+                        openSettings()
                     }
                     .buttonStyle(.borderedProminent)
                 }
                 .padding(12)
                 .frame(maxWidth: .infinity)
                 .background(.orange.opacity(0.12))
+            }
+        }
+        .onAppear {
+            // Settings used to live in the list column; keep browsing state if so.
+            if appModel.selectedSidebarItem == .settings {
+                appModel.selectedSidebarItem = .inbox
             }
         }
         .onChange(of: appModel.searchText) { _, newValue in
@@ -86,9 +91,10 @@ struct MainSplitView: View {
 
 private struct ShortcutRailView: View {
     @Environment(AppModel.self) private var appModel
+    @Environment(\.openSettings) private var openSettings
 
     private let shortcuts: [SidebarItem] = [
-        .inbox, .favorites, .important, .archive, .tags, .settings,
+        .inbox, .favorites, .important, .archive, .tags,
     ]
 
     var body: some View {
@@ -111,6 +117,21 @@ private struct ShortcutRailView: View {
             }
 
             Spacer(minLength: 0)
+
+            Button {
+                openSettings()
+            } label: {
+                Image(systemName: SidebarItem.settings.systemImage)
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundStyle(Color.primary.opacity(0.85))
+                    .frame(width: 40, height: 40)
+                    .background(
+                        Color.primary.opacity(0.06),
+                        in: RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    )
+            }
+            .buttonStyle(.plain)
+            .help(Text(SidebarItem.settings.titleKey))
         }
         .padding(.vertical, 14)
         .padding(.horizontal, 12)

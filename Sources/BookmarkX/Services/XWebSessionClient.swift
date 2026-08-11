@@ -22,13 +22,13 @@ enum XWebSessionError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .missingCookies:
-            String(localized: "auth.session.missingCookies")
+            AppLocalization.text("auth.session.missingCookies")
         case .invalidResponse:
-            String(localized: "auth.session.invalidResponse")
+            AppLocalization.text("auth.session.invalidResponse")
         case .server(let statusCode, let message):
             "X \(statusCode): \(message)"
         case .notSignedIn:
-            String(localized: "auth.session.notSignedIn")
+            AppLocalization.text("auth.session.notSignedIn")
         }
     }
 }

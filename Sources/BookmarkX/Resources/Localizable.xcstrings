@@ -982,7 +982,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "在 X 打开"
+            "value": "在 X 上打开"
           }
         }
       }
@@ -1152,7 +1152,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "使用 Grok"
+            "value": "使用 Grok 整理"
           }
         }
       }
@@ -1407,7 +1407,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "仅需配置一次：创建 X Native App，回调填 bookmarkx://oauth/x/callback，粘贴 Client ID。之后每次都在默认浏览器登录。"
+            "value": "仅需配置一次：创建 X 原生应用，回调填 bookmarkx://oauth/x/callback，粘贴客户端 ID。之后每次都在默认浏览器登录。"
           }
         }
       }
@@ -1424,7 +1424,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "可选：xAI API Key"
+            "value": "可选：xAI 接口密钥"
           }
         }
       }
@@ -1747,7 +1747,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "高级：X Developer Client ID"
+            "value": "高级：X 开发者客户端 ID"
           }
         }
       }
@@ -1764,7 +1764,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "在 X Developer 创建 Native App，回调填 bookmarkx://oauth/x/callback，然后把 Client ID 粘贴到这里。"
+            "value": "在 X 开发者平台创建原生应用（Native App），回调地址填 bookmarkx://oauth/x/callback，然后把客户端 ID 粘贴到这里。"
           }
         }
       }
@@ -1798,7 +1798,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "修改 Client ID"
+            "value": "修改客户端 ID"
           }
         }
       }
@@ -1815,7 +1815,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "使用 X 登录以同步书签并使用 Premium Grok"
+            "value": "尚未登录 X"
           }
         }
       }
@@ -1832,7 +1832,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "打开设置"
+            "value": "去设置登录"
           }
         }
       }
@@ -1934,7 +1934,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "X OAuth 2.0 Client ID"
+            "value": "X OAuth 2.0 客户端 ID"
           }
         }
       }
@@ -2070,7 +2070,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "Grok API Key"
+            "value": "Grok 接口密钥"
           }
         }
       }
@@ -2087,7 +2087,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "Grok"
+            "value": "Grok 智能整理"
           }
         }
       }
@@ -2138,7 +2138,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "X Premium：连接 X 后使用会员 Grok 额度。API Key：使用 console.x.ai 账单。自动：优先 Premium，失败则回退 API Key。"
+            "value": "X Premium：连接 X 后使用会员 Grok 额度。接口密钥：使用 console.x.ai 账单。自动：优先 Premium，失败则回退接口密钥。"
           }
         }
       }
@@ -2155,7 +2155,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "打开 xAI Console"
+            "value": "打开 xAI 控制台"
           }
         }
       }
@@ -2223,7 +2223,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "X Premium Grok"
+            "value": "X Premium 的 Grok"
           }
         }
       }
@@ -2240,7 +2240,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "使用 X 登录后，直接使用 X Premium Grok 会员额度。"
+            "value": "连接 X 后，使用你的 Premium 会员 Grok 额度。"
           }
         }
       }
@@ -2257,7 +2257,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "xAI API Key"
+            "value": "xAI 接口密钥"
           }
         }
       }
@@ -2274,7 +2274,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "使用 console.x.ai 的 API Key，与 X Premium 会员额度分开计费。"
+            "value": "使用 console.x.ai 的接口密钥，与 X Premium 会员额度分开计费。"
           }
         }
       }
@@ -2325,7 +2325,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "X Premium Grok 已就绪"
+            "value": "X Premium 的 Grok 已就绪"
           }
         }
       }
@@ -2342,7 +2342,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "请先连接 X 以使用 Premium Grok"
+            "value": "请先连接 X 以使用 Premium 的 Grok"
           }
         }
       }
@@ -2359,7 +2359,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "API Key 已就绪"
+            "value": "接口密钥已就绪"
           }
         }
       }
@@ -2376,7 +2376,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "未配置 API Key"
+            "value": "未配置接口密钥"
           }
         }
       }
@@ -2410,7 +2410,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "自动 · Premium + API 回退"
+            "value": "自动 · Premium + 接口密钥回退"
           }
         }
       }
@@ -2427,7 +2427,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "自动 · API Key"
+            "value": "自动 · 接口密钥"
           }
         }
       }
@@ -2478,7 +2478,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "请先保存 xAI API Key。"
+            "value": "请先保存 xAI 接口密钥。"
           }
         }
       }
@@ -2512,7 +2512,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "X Premium Grok 需要先连接 X 账号。"
+            "value": "使用 X Premium 的 Grok 需要先连接 X 账号。"
           }
         }
       }
@@ -2597,7 +2597,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "保存 Grok Key"
+            "value": "保存 Grok 密钥"
           }
         }
       }
@@ -2614,7 +2614,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "Grok API Key 已保存。"
+            "value": "Grok 接口密钥已保存。"
           }
         }
       }
@@ -2750,7 +2750,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "本地 SQLite"
+            "value": "本地 SQLite 数据库"
           }
         }
       }
@@ -2852,7 +2852,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "未配置 Grok Key"
+            "value": "未配置 Grok 密钥"
           }
         }
       }
@@ -2869,7 +2869,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "请填写 X 开发者应用的 OAuth 2.0 Client ID。"
+            "value": "请填写 X 开发者应用的 OAuth 2.0 客户端 ID。"
           }
         }
       }
@@ -3073,7 +3073,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "English"
+            "value": "英语"
           }
         }
       }
@@ -3503,6 +3503,57 @@
         }
       }
     },
+    "bookmarks.moveToFolder": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Move to Folder"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "移动到文件夹"
+          }
+        }
+      }
+    },
+    "bookmarks.moveToFolder.empty": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No folders yet"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "还没有文件夹"
+          }
+        }
+      }
+    },
+    "bookmarks.removeFromFolder": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Remove from Folder"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "移出文件夹"
+          }
+        }
+      }
+    },
     "bookmarks.unarchive": {
       "extractionState": "manual",
       "localizations": {
@@ -3737,6 +3788,57 @@
           "stringUnit": {
             "state": "translated",
             "value": "去年"
+          }
+        }
+      }
+    },
+    "grok.error.serverFormat": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Grok %lld: %@"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Grok 错误 %lld：%@"
+          }
+        }
+      }
+    },
+    "oauth.error.randomFailedFormat": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Secure random generation failed: %d"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "安全随机数生成失败：%d"
+          }
+        }
+      }
+    },
+    "oauth.error.serverFormat": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "X API %lld: %@"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "X 接口错误 %lld：%@"
           }
         }
       }

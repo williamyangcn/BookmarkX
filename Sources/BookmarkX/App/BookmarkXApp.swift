@@ -26,6 +26,7 @@ struct BookmarkXApp: App {
             SettingsView()
                 .environment(appModel)
                 .environment(\.locale, appModel.settings.interfaceLanguage.locale)
+                .frame(minWidth: 480, idealWidth: 560, minHeight: 620)
         }
     }
 }

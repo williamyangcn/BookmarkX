@@ -78,7 +78,7 @@ final class AppModel {
         } else {
             do {
                 try await bookmarkStore?.reload(searchText: searchText)
-                syncStatusMessage = String(localized: "sync.status.signInRequired")
+                syncStatusMessage = AppLocalization.text("sync.status.signInRequired")
             } catch {
                 syncStatusMessage = error.localizedDescription
             }
@@ -90,21 +90,17 @@ final class AppModel {
         guard !isSyncing else { return }
 
         isSyncing = true
-        syncStatusMessage = String(localized: "sync.status.running")
+        syncStatusMessage = AppLocalization.text("sync.status.running")
         defer { isSyncing = false }
 
         do {
             let result = try await syncService.sync(options: settings.syncOptions)
             try await bookmarkStore?.reload(searchText: searchText)
-            syncStatusMessage = String(
-                format: String(localized: "sync.status.completedFormat"),
-                locale: .current,
-                result.imported,
+            syncStatusMessage = AppLocalization.format("sync.status.completedFormat", result.imported,
                 result.updated,
                 result.restored,
                 result.skipped,
-                settings.syncBatchSize
-            )
+                settings.syncBatchSize)
             await enrichPendingBookmarks()
         } catch {
             syncStatusMessage = error.localizedDescription
@@ -143,7 +139,7 @@ final class AppModel {
         do {
             let items = try await bookmarkStore.allEnrichmentItems()
             guard !items.isEmpty else {
-                syncStatusMessage = String(localized: "enrichment.status.nothingToReclassify")
+                syncStatusMessage = AppLocalization.text("enrichment.status.nothingToReclassify")
                 return
             }
             await runEnrichment(items: items, forceLocal: true)
@@ -165,12 +161,8 @@ final class AppModel {
         var existingFolders = (try? await bookmarkStore.folderNames()) ?? []
 
         for item in items {
-            syncStatusMessage = String(
-                format: String(localized: "enrichment.status.runningFormat"),
-                locale: .current,
-                completed + failed + 1,
-                items.count
-            )
+            syncStatusMessage = AppLocalization.format("enrichment.status.runningFormat", completed + failed + 1,
+                items.count)
             do {
                 var enrichment: GrokEnrichment
                 if useLocalFallback {
@@ -238,19 +230,11 @@ final class AppModel {
 
         try? await bookmarkStore.reload(searchText: searchText)
         if failed == 0 {
-            syncStatusMessage = String(
-                format: String(localized: "enrichment.status.completedFormat"),
-                locale: .current,
-                completed
-            )
+            syncStatusMessage = AppLocalization.format("enrichment.status.completedFormat", completed)
         } else {
-            syncStatusMessage = String(
-                format: String(localized: "enrichment.status.partialFormat"),
-                locale: .current,
-                completed,
+            syncStatusMessage = AppLocalization.format("enrichment.status.partialFormat", completed,
                 failed,
-                firstError ?? ""
-            )
+                firstError ?? "")
         }
     }
 
@@ -260,9 +244,9 @@ final class AppModel {
             try bookmarkStore?.deleteLocally(tweetID: tweetID)
             if alsoFromX, let syncService {
                 try await syncService.deleteRemoteBookmark(tweetID: tweetID)
-                syncStatusMessage = String(localized: "bookmarks.deletedLocalAndX")
+                syncStatusMessage = AppLocalization.text("bookmarks.deletedLocalAndX")
             } else {
-                syncStatusMessage = String(localized: "bookmarks.deletedLocal")
+                syncStatusMessage = AppLocalization.text("bookmarks.deletedLocal")
             }
             if selectedBookmarkID == tweetID {
                 selectedBookmarkID = nil
@@ -305,6 +289,8 @@ final class AppModel {
     }
 
     func selectSidebarItem(_ item: SidebarItem) {
+        // Settings opens as a separate macOS Settings window, not a column.
+        guard item != .settings else { return }
         if item == .inbox {
             Task { await enterInbox() }
             return
@@ -336,6 +322,16 @@ final class AppModel {
     func setArchived(tweetID: String, isArchived: Bool) async {
         do {
             try bookmarkStore?.setArchived(tweetID: tweetID, isArchived: isArchived)
+            try await bookmarkStore?.reload(searchText: searchText)
+        } catch {
+            syncStatusMessage = error.localizedDescription
+        }
+    }
+
+    /// Manually assign a folder. Marks category as manual so auto-enrichment will not override it.
+    func moveBookmark(tweetID: String, toFolderID folderID: String?) async {
+        do {
+            try bookmarkStore?.moveBookmark(tweetID: tweetID, toFolderID: folderID)
             try await bookmarkStore?.reload(searchText: searchText)
         } catch {
             syncStatusMessage = error.localizedDescription
