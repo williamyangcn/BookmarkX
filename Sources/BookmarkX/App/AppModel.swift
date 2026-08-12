@@ -36,6 +36,11 @@ final class AppModel {
 
     @ObservationIgnored
     private var autoReadTask: Task<Void, Never>?
+    /// When enrichment is already running, coalesce another pass instead of dropping it.
+    @ObservationIgnored
+    private var enrichRerunRequested = false
+    @ObservationIgnored
+    private var enrichRerunForceLocal = false
 
     /// Items marked read during the current Inbox visit — stay visible until next Inbox entry.
     private(set) var inboxSessionRetainedIDs: Set<String> = []
@@ -91,7 +96,19 @@ final class AppModel {
 
         isSyncing = true
         syncStatusMessage = AppLocalization.text("sync.status.running")
-        defer { isSyncing = false }
+        defer {
+            isSyncing = false
+            syncService.onProgress = nil
+        }
+
+        syncService.onProgress = { [weak self] page, result in
+            self?.syncStatusMessage = AppLocalization.format(
+                "sync.status.progressFormat",
+                page,
+                result.imported + result.restored,
+                result.skipped
+            )
+        }
 
         do {
             let result = try await syncService.sync(options: settings.syncOptions)
@@ -102,15 +119,18 @@ final class AppModel {
                 result.restored,
                 result.skipped,
                 settings.syncBatchSize)
-            // Enrichment can take minutes with Grok; don't block the sync spinner.
-            Task { await enrichPendingBookmarks() }
+
+            // Folders/titles first via local classifier (fast), then optional Grok upgrade.
+            await enrichPendingBookmarks(forceLocal: true)
+            if connectionStatus.isGrokConfigured {
+                Task { await upgradeLocalEnrichmentsWithGrok() }
+            }
         } catch {
             syncStatusMessage = error.localizedDescription
         }
     }
 
     private func applySyncProgress(from result: BookmarkSyncResult) {
-        // Drop legacy watermark — catch-up now uses consecutive local skips.
         settings.syncNewestWatermark = nil
         if result.reachedEndOfRemoteList {
             settings.syncBackfillComplete = true
@@ -124,22 +144,86 @@ final class AppModel {
 
     /// Generates title, summary, category folder, and tags for all unprocessed
     /// active synced bookmarks. Existing rows are picked up once by `processed_at`.
-    /// Always allowed: falls back to the local classifier when Grok is unavailable.
-    func enrichPendingBookmarks() async {
-        guard !isEnriching else { return }
+    /// - Parameter forceLocal: Prefer the local classifier so folders appear immediately.
+    func enrichPendingBookmarks(forceLocal: Bool = false) async {
+        if isEnriching {
+            requestEnrichRerun(forceLocal: forceLocal)
+            return
+        }
         guard let bookmarkStore else { return }
+
+        isEnriching = true
+        defer { isEnriching = false }
+
+        var useForceLocal = forceLocal
+        repeat {
+            enrichRerunRequested = false
+            do {
+                if !useForceLocal {
+                    await configureGrokClient()
+                }
+                let items = try await bookmarkStore.pendingEnrichmentItems()
+                if !items.isEmpty {
+                    let useLocal = useForceLocal || !connectionStatus.isGrokConfigured
+                    await runEnrichment(items: items, forceLocal: useLocal)
+                }
+            } catch {
+                syncStatusMessage = error.localizedDescription
+            }
+            if enrichRerunRequested {
+                useForceLocal = enrichRerunForceLocal
+            }
+        } while enrichRerunRequested
+    }
+
+    /// Re-run Grok over rows that only received the local fallback after sync.
+    func upgradeLocalEnrichmentsWithGrok() async {
+        guard connectionStatus.isGrokConfigured else { return }
+        guard let bookmarkStore else { return }
+        if isEnriching {
+            requestEnrichRerun(forceLocal: false)
+            return
+        }
 
         isEnriching = true
         defer { isEnriching = false }
 
         do {
             await configureGrokClient()
-            let items = try await bookmarkStore.pendingEnrichmentItems()
-            guard !items.isEmpty else { return }
-            await runEnrichment(items: items, forceLocal: !connectionStatus.isGrokConfigured)
+            let items = try await bookmarkStore.localFallbackEnrichmentItems()
+            if !items.isEmpty {
+                await runEnrichment(items: items, forceLocal: false)
+            }
         } catch {
             syncStatusMessage = error.localizedDescription
         }
+
+        // Drain any pending/coalesced enrich that arrived while upgrading.
+        while enrichRerunRequested {
+            let againLocal = enrichRerunForceLocal
+            enrichRerunRequested = false
+            do {
+                if !againLocal {
+                    await configureGrokClient()
+                }
+                let items = try await bookmarkStore.pendingEnrichmentItems()
+                if !items.isEmpty {
+                    let useLocal = againLocal || !connectionStatus.isGrokConfigured
+                    await runEnrichment(items: items, forceLocal: useLocal)
+                }
+            } catch {
+                syncStatusMessage = error.localizedDescription
+            }
+        }
+    }
+
+    private func requestEnrichRerun(forceLocal: Bool) {
+        if !enrichRerunRequested {
+            enrichRerunForceLocal = forceLocal
+        } else {
+            enrichRerunForceLocal = enrichRerunForceLocal && forceLocal
+        }
+        enrichRerunRequested = true
     }
 
     /// Re-run classification for every downloaded bookmark so folders rebuild from content.
@@ -158,7 +242,7 @@ final class AppModel {
                 return
             }
             await runEnrichment(items: items, forceLocal: true)
-            try await bookmarkStore.pruneEmptyFolders()
+            // Do not auto-delete empty folders — user-created folders must survive upgrades.
             try await bookmarkStore.reload(searchText: searchText)
             settings.folderTaxonomyVersion = AppSettings.currentFolderTaxonomyVersion
         } catch {

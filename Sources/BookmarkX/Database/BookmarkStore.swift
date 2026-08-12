@@ -116,6 +116,13 @@ final class BookmarkStore {
         }
     }
 
+    /// Rows classified only by the local fallback — eligible for a later Grok upgrade.
+    func localFallbackEnrichmentItems() async throws -> [BookmarkEnrichmentItem] {
+        try await database.dbWriter.read { db in
+            try BookmarkQueries.fetchLocalFallbackEnrichmentItems(db: db)
+        }
+    }
+
     /// All active synced bookmarks — used for force reclassify / folder rebuild.
     func allEnrichmentItems() async throws -> [BookmarkEnrichmentItem] {
         try await database.dbWriter.read { db in
@@ -130,6 +137,7 @@ final class BookmarkStore {
     }
 
     /// Drop folders that no longer contain any non-deleted bookmarks.
+    /// Only call from an explicit user action — never during upgrade / reclassify.
     func pruneEmptyFolders() async throws {
         try await database.dbWriter.write { db in
             try db.execute(
@@ -528,6 +536,55 @@ enum BookmarkQueries {
             WHERE b.is_deleted = 0
               AND b.synced_at IS NOT NULL
             ORDER BY b.bookmarked_at DESC
+            """
+        ).map {
+            BookmarkEnrichmentItem(
+                tweetID: $0.tweetID,
+                text: $0.text,
+                authorUsername: $0.authorUsername,
+                hasMedia: $0.hasMedia,
+                currentTitle: $0.currentTitle
+            )
+        }
+    }
+
+    static func fetchLocalFallbackEnrichmentItems(db: Database) throws -> [BookmarkEnrichmentItem] {
+        struct Row: Decodable, FetchableRecord {
+            var tweetID: String
+            var text: String
+            var authorUsername: String
+            var hasMedia: Bool
+            var currentTitle: String?
+
+            enum CodingKeys: String, CodingKey {
+                case tweetID = "tweet_id"
+                case text
+                case authorUsername = "author_username"
+                case hasMedia = "has_media"
+                case currentTitle = "current_title"
+            }
+        }
+
+        return try Row.fetchAll(
+            db,
+            sql: """
+            SELECT
+                b.tweet_id AS tweet_id,
+                t.text AS text,
+                a.username AS author_username,
+                EXISTS(SELECT 1 FROM media m WHERE m.tweet_id = b.tweet_id) AS has_media,
+                ai.title AS current_title
+            FROM bookmarks b
+            JOIN tweets t ON t.id = b.tweet_id
+            JOIN authors a ON a.id = t.author_id
+            JOIN ai_results ai ON ai.tweet_id = b.tweet_id
+            WHERE b.is_deleted = 0
+              AND b.synced_at IS NOT NULL
+              AND ai.is_category_manual = 0
+              AND ai.is_summary_manual = 0
+              AND ai.model LIKE 'local%'
+            ORDER BY b.bookmarked_at DESC
+            LIMIT 100
             """
         ).map {
             BookmarkEnrichmentItem(

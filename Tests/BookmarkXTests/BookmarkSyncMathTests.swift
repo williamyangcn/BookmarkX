@@ -42,13 +42,13 @@ final class BookmarkSyncMathTests: XCTestCase {
         XCTAssertFalse(
             BookmarkSyncMath.shouldStopCatchUp(
                 skipAlreadySynced: true,
-                consecutiveSkips: 14
+                consecutiveSkips: 7
             )
         )
         XCTAssertTrue(
             BookmarkSyncMath.shouldStopCatchUp(
                 skipAlreadySynced: true,
-                consecutiveSkips: 15
+                consecutiveSkips: 8
             )
         )
         XCTAssertFalse(
@@ -57,5 +57,19 @@ final class BookmarkSyncMathTests: XCTestCase {
                 consecutiveSkips: 100
             )
         )
+    }
+
+    func testCatchUpSkipStreakDoesNotBlockFurtherSamePageImports() {
+        // After the streak threshold, catch-up still finishes the current page
+        // (importing any remaining non-local rows) before stopping pagination.
+        // This guards the mid-page hole regression: do not treat "should stop"
+        // as "break out of the page loop immediately".
+        XCTAssertTrue(
+            BookmarkSyncMath.shouldStopCatchUp(
+                skipAlreadySynced: true,
+                consecutiveSkips: BookmarkSyncMath.catchUpSkipStreak
+            )
+        )
+        XCTAssertEqual(BookmarkSyncMath.catchUpSkipStreak, 8)
     }
 }

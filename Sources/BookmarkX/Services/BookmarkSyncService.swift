@@ -10,10 +10,13 @@ struct BookmarkSyncOptions: Sendable, Equatable {
     var skipAlreadySynced: Bool = true
     /// After a bookmark is saved locally, delete it from X.
     var deleteFromXAfterSync: Bool = false
-    /// True once a prior sync walked to the end of the remote list.
-    var backfillComplete: Bool = false
-    /// Pagination cursor for resuming older bookmark backfill after catch-up.
+    /// When true, continue past the catch-up frontier to download older bookmarks.
+    /// AppSettings turns this on until `backfillComplete` so older pages keep draining.
+    var deepBackfill: Bool = false
+    /// Pagination cursor for resuming older bookmark backfill.
     var backfillCursor: String? = nil
+    /// True once a prior deep sync walked to the end of the remote list.
+    var backfillComplete: Bool = false
 }
 
 struct BookmarkSyncResult: Sendable, Equatable {
@@ -24,11 +27,9 @@ struct BookmarkSyncResult: Sendable, Equatable {
     var restored: Int = 0
     var deletedFromX: Int = 0
     var failedDeletes: Int = 0
-    /// Cursor to resume older backfill; nil when finished or unused this run.
+    var pages: Int = 0
     var newBackfillCursor: String? = nil
-    /// Remote list exhausted.
     var reachedEndOfRemoteList: Bool = false
-    /// Catch-up stopped after a streak of already-local bookmarks.
     var stoppedAtKnownFrontier: Bool = false
 }
 
@@ -51,9 +52,8 @@ enum BookmarkSyncMath {
         return gained + result.updated
     }
 
-    /// Newest-first catch-up: after this many already-local hits in a row, older pages
-    /// won't contain brand-new bookmarks.
-    static let catchUpSkipStreak = 15
+    /// Newest-first catch-up: after this many already-local hits in a row, stop.
+    static let catchUpSkipStreak = 8
 
     static func shouldStopCatchUp(
         skipAlreadySynced: Bool,
@@ -81,7 +81,13 @@ final class BookmarkSyncService {
     private var isRunning = false
     private var transport: SyncTransport?
 
-    private let maxPagesPerSync = 100
+    /// Catch-up should finish in a couple of pages; deep backfill scans a bounded
+    /// window per refresh so older bookmarks keep downloading without multi-minute runs.
+    private let maxCatchUpPages = 5
+    private let maxDeepBackfillPages = 15
+
+    /// Optional UI progress (page / imported / skipped).
+    var onProgress: (@MainActor (Int, BookmarkSyncResult) -> Void)?
 
     init(
         database: AppDatabase,
@@ -142,49 +148,51 @@ final class BookmarkSyncService {
             let target = min(max(options.batchSize, 1), 100)
             var pages = 0
 
-            // Phase 1: newest → older until a streak of already-local items (catch-up).
+            // Phase 1: newest → older until already-local streak (picks up brand-new bookmarks fast).
             let catchUp = try await runSyncPass(
                 transport: transport,
                 options: options,
                 result: &result,
                 target: target,
                 pages: &pages,
+                pageBudget: maxCatchUpPages,
                 startCursor: nil,
                 stopAfterSkipStreak: options.skipAlreadySynced
             )
 
-            let needsBackfill = options.skipAlreadySynced
+            // Phase 2: continue older pages until batch is filled or page budget hits.
+            // Do NOT early-stop on skips here — local head is contiguous; older holes sit below.
+            let needsBackfill = options.deepBackfill
+                && options.skipAlreadySynced
                 && !options.backfillComplete
                 && !catchUp.reachedRemoteEnd
                 && BookmarkSyncMath.batchProgress(result, skipAlreadySynced: true) < target
 
             if needsBackfill {
+                // nil resume = first page (catch-up stopped mid-page on the head).
                 let resume = options.backfillCursor ?? catchUp.nextCursor
-                if let resume, !resume.isEmpty {
-                    result.stoppedAtKnownFrontier = false
-                    let backfill = try await runSyncPass(
-                        transport: transport,
-                        options: options,
-                        result: &result,
-                        target: target,
-                        pages: &pages,
-                        startCursor: resume,
-                        stopAfterSkipStreak: false
-                    )
-                    result.reachedEndOfRemoteList = backfill.reachedRemoteEnd
-                    result.newBackfillCursor = backfill.reachedRemoteEnd ? nil : backfill.nextCursor
-                } else {
-                    result.reachedEndOfRemoteList = catchUp.reachedRemoteEnd
-                    result.newBackfillCursor = catchUp.nextCursor
-                }
+                result.stoppedAtKnownFrontier = false
+                let backfill = try await runSyncPass(
+                    transport: transport,
+                    options: options,
+                    result: &result,
+                    target: target,
+                    pages: &pages,
+                    pageBudget: maxDeepBackfillPages,
+                    startCursor: resume,
+                    stopAfterSkipStreak: false
+                )
+                result.reachedEndOfRemoteList = backfill.reachedRemoteEnd
+                // Always advance the cursor so the next refresh continues past skipped pages.
+                result.newBackfillCursor = backfill.reachedRemoteEnd ? nil : backfill.nextCursor
             } else {
-                result.reachedEndOfRemoteList = catchUp.reachedRemoteEnd || options.backfillComplete
-                if result.reachedEndOfRemoteList {
+                result.reachedEndOfRemoteList = catchUp.reachedRemoteEnd
+                if catchUp.reachedRemoteEnd {
                     result.newBackfillCursor = nil
-                } else if catchUp.stoppedAtSkipStreak {
-                    // Keep prior backfill cursor; catch-up alone doesn't advance it.
-                    result.newBackfillCursor = options.backfillCursor ?? catchUp.nextCursor
+                } else if options.backfillComplete {
+                    result.newBackfillCursor = nil
                 } else {
+                    // Preserve / seed resume point after catch-up-only runs.
                     result.newBackfillCursor = options.backfillCursor ?? catchUp.nextCursor
                 }
             }
@@ -193,6 +201,7 @@ final class BookmarkSyncService {
                 result.newBackfillCursor = nil
             }
 
+            result.pages = pages
             lastResult = result
             phase = .completed(result)
             isRunning = false
@@ -223,20 +232,25 @@ final class BookmarkSyncService {
         result: inout BookmarkSyncResult,
         target: Int,
         pages: inout Int,
+        pageBudget: Int,
         startCursor: String?,
         stopAfterSkipStreak: Bool
     ) async throws -> SyncPassOutcome {
         var paginationToken = startCursor
         var outcome = SyncPassOutcome()
         var consecutiveSkips = 0
+        var pagesInPass = 0
 
         pageLoop: while BookmarkSyncMath.batchProgress(result, skipAlreadySynced: options.skipAlreadySynced) < target {
             pages += 1
-            if pages > maxPagesPerSync {
+            pagesInPass += 1
+            if pagesInPass > pageBudget {
                 break
             }
 
             phase = .fetching
+            onProgress?(pages, result)
+
             let page = try await fetchPage(
                 transport: transport,
                 maxResults: 100,
@@ -292,8 +306,9 @@ final class BookmarkSyncService {
                                skipAlreadySynced: true,
                                consecutiveSkips: localStreak
                            ) {
+                            // Finish the rest of this page so mid-page holes aren't
+                            // skipped when backfill resumes at the next page token.
                             hitSkipStreak = true
-                            break
                         }
                         continue
                     }
@@ -346,6 +361,8 @@ final class BookmarkSyncService {
                     }
                 }
             }
+
+            onProgress?(pages, result)
 
             if outcome.stoppedAtSkipStreak {
                 outcome.nextCursor = page.nextToken

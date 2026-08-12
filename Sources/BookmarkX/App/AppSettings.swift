@@ -108,8 +108,10 @@ final class AppSettings {
             newestFirst: true,
             skipAlreadySynced: syncSkipAlreadySynced,
             deleteFromXAfterSync: syncDeleteFromXAfterSync,
-            backfillComplete: syncBackfillComplete,
-            backfillCursor: syncBackfillCursor
+            // Keep downloading older bookmarks until X list is exhausted.
+            deepBackfill: !syncBackfillComplete,
+            backfillCursor: syncBackfillCursor,
+            backfillComplete: syncBackfillComplete
         )
     }
 

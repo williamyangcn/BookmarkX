@@ -120,6 +120,23 @@
         }
       }
     },
+    "sync.status.progressFormat": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Syncing… page %lld · new %lld · skipped %lld"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "同步中… 第 %lld 页 · 新增 %lld · 跳过 %lld"
+          }
+        }
+      }
+    },
     "enrichment.status.running": {
       "extractionState": "manual",
       "localizations": {

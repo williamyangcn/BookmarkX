@@ -1,6 +1,12 @@
 #!/usr/bin/env bash
 # Replace /Applications/BookmarkX.app with a freshly built Release app.
-# Never touches Application Support, credentials, or the local database.
+#
+# DATA SAFETY:
+# - Touches ONLY the .app bundle and Desktop alias.
+# - Never reads/writes/deletes:
+#     ~/Library/Containers/com.williamyang.BookmarkX/   (sandboxed live data)
+#     ~/Library/Application Support/BookmarkX/            (legacy data)
+# - Never runs sqlite, never clears credentials, never prunes folders.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -16,7 +22,9 @@ fi
 
 VERSION="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "${SRC}/Contents/Info.plist" 2>/dev/null || echo unknown)"
 echo "==> Installing BookmarkX ${VERSION} → ${DEST}"
-echo "    (app bundle only — Application Support / login / DB untouched)"
+echo "    App bundle only. Data paths left untouched:"
+echo "      • ~/Library/Containers/com.williamyang.BookmarkX/"
+echo "      • ~/Library/Application Support/BookmarkX/"
 
 # Quit if running so the bundle can be replaced cleanly.
 if pgrep -x BookmarkX >/dev/null 2>&1; then
@@ -56,3 +64,4 @@ INSTALLED="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "${D
 echo ""
 echo "Installed: ${DEST} (${INSTALLED})"
 echo "Desktop alias refreshed → ${DEST}"
+echo "User data was not modified."
