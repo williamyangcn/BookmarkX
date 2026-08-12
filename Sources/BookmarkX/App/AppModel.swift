@@ -36,6 +36,11 @@ final class AppModel {
 
     @ObservationIgnored
     private var autoReadTask: Task<Void, Never>?
+    /// When enrichment is already running, coalesce another pass instead of dropping it.
+    @ObservationIgnored
+    private var enrichRerunRequested = false
+    @ObservationIgnored
+    private var enrichRerunForceLocal = false
 
     /// Items marked read during the current Inbox visit — stay visible until next Inbox entry.
     private(set) var inboxSessionRetainedIDs: Set<String> = []
@@ -115,13 +120,10 @@ final class AppModel {
                 result.skipped,
                 settings.syncBatchSize)
 
-            // Folder/title assignment must happen right after sync — local classifier is fast.
-            // Await so the list shows folders before we clear the sync spinner.
-            let gained = result.imported + result.restored
-            if gained > 0 {
-                await enrichPendingBookmarks(forceLocal: true)
-            } else {
-                Task { await enrichPendingBookmarks(forceLocal: true) }
+            // Folders/titles first via local classifier (fast), then optional Grok upgrade.
+            await enrichPendingBookmarks(forceLocal: true)
+            if connectionStatus.isGrokConfigured {
+                Task { await upgradeLocalEnrichmentsWithGrok() }
             }
         } catch {
             syncStatusMessage = error.localizedDescription
@@ -144,23 +146,84 @@ final class AppModel {
     /// active synced bookmarks. Existing rows are picked up once by `processed_at`.
     /// - Parameter forceLocal: Prefer the local classifier so folders appear immediately.
     func enrichPendingBookmarks(forceLocal: Bool = false) async {
-        guard !isEnriching else { return }
+        if isEnriching {
+            requestEnrichRerun(forceLocal: forceLocal)
+            return
+        }
         guard let bookmarkStore else { return }
 
         isEnriching = true
         defer { isEnriching = false }
 
-        do {
-            if !forceLocal {
-                await configureGrokClient()
+        var useForceLocal = forceLocal
+        repeat {
+            enrichRerunRequested = false
+            do {
+                if !useForceLocal {
+                    await configureGrokClient()
+                }
+                let items = try await bookmarkStore.pendingEnrichmentItems()
+                if !items.isEmpty {
+                    let useLocal = useForceLocal || !connectionStatus.isGrokConfigured
+                    await runEnrichment(items: items, forceLocal: useLocal)
+                }
+            } catch {
+                syncStatusMessage = error.localizedDescription
             }
-            let items = try await bookmarkStore.pendingEnrichmentItems()
-            guard !items.isEmpty else { return }
-            let useLocal = forceLocal || !connectionStatus.isGrokConfigured
-            await runEnrichment(items: items, forceLocal: useLocal)
+            if enrichRerunRequested {
+                useForceLocal = enrichRerunForceLocal
+            }
+        } while enrichRerunRequested
+    }
+
+    /// Re-run Grok over rows that only received the local fallback after sync.
+    func upgradeLocalEnrichmentsWithGrok() async {
+        guard connectionStatus.isGrokConfigured else { return }
+        guard let bookmarkStore else { return }
+        if isEnriching {
+            requestEnrichRerun(forceLocal: false)
+            return
+        }
+
+        isEnriching = true
+        defer { isEnriching = false }
+
+        do {
+            await configureGrokClient()
+            let items = try await bookmarkStore.localFallbackEnrichmentItems()
+            if !items.isEmpty {
+                await runEnrichment(items: items, forceLocal: false)
+            }
         } catch {
             syncStatusMessage = error.localizedDescription
         }
+
+        // Drain any pending/coalesced enrich that arrived while upgrading.
+        while enrichRerunRequested {
+            let againLocal = enrichRerunForceLocal
+            enrichRerunRequested = false
+            do {
+                if !againLocal {
+                    await configureGrokClient()
+                }
+                let items = try await bookmarkStore.pendingEnrichmentItems()
+                if !items.isEmpty {
+                    let useLocal = againLocal || !connectionStatus.isGrokConfigured
+                    await runEnrichment(items: items, forceLocal: useLocal)
+                }
+            } catch {
+                syncStatusMessage = error.localizedDescription
+            }
+        }
+    }
+
+    private func requestEnrichRerun(forceLocal: Bool) {
+        if !enrichRerunRequested {
+            enrichRerunForceLocal = forceLocal
+        } else {
+            enrichRerunForceLocal = enrichRerunForceLocal && forceLocal
+        }
+        enrichRerunRequested = true
     }
 
     /// Re-run classification for every downloaded bookmark so folders rebuild from content.

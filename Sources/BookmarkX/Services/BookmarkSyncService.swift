@@ -11,7 +11,7 @@ struct BookmarkSyncOptions: Sendable, Equatable {
     /// After a bookmark is saved locally, delete it from X.
     var deleteFromXAfterSync: Bool = false
     /// When true, continue past the catch-up frontier to download older bookmarks.
-    /// Normal refresh leaves this false so sync stays fast.
+    /// AppSettings turns this on until `backfillComplete` so older pages keep draining.
     var deepBackfill: Bool = false
     /// Pagination cursor for resuming older bookmark backfill.
     var backfillCursor: String? = nil
@@ -81,9 +81,10 @@ final class BookmarkSyncService {
     private var isRunning = false
     private var transport: SyncTransport?
 
-    /// Catch-up should finish in a couple of pages; deep backfill is capped separately.
-    private let maxCatchUpPages = 10
-    private let maxDeepBackfillPages = 20
+    /// Catch-up should finish in a couple of pages; deep backfill scans a bounded
+    /// window per refresh so older bookmarks keep downloading without multi-minute runs.
+    private let maxCatchUpPages = 5
+    private let maxDeepBackfillPages = 15
 
     /// Optional UI progress (page / imported / skipped).
     var onProgress: (@MainActor (Int, BookmarkSyncResult) -> Void)?
@@ -147,7 +148,7 @@ final class BookmarkSyncService {
             let target = min(max(options.batchSize, 1), 100)
             var pages = 0
 
-            // Normal refresh: newest → older until we hit already-local bookmarks.
+            // Phase 1: newest → older until already-local streak (picks up brand-new bookmarks fast).
             let catchUp = try await runSyncPass(
                 transport: transport,
                 options: options,
@@ -159,7 +160,8 @@ final class BookmarkSyncService {
                 stopAfterSkipStreak: options.skipAlreadySynced
             )
 
-            // Deep backfill is opt-in only — never run on every refresh.
+            // Phase 2: continue older pages until batch is filled or page budget hits.
+            // Do NOT early-stop on skips here — local head is contiguous; older holes sit below.
             let needsBackfill = options.deepBackfill
                 && options.skipAlreadySynced
                 && !options.backfillComplete
@@ -167,39 +169,30 @@ final class BookmarkSyncService {
                 && BookmarkSyncMath.batchProgress(result, skipAlreadySynced: true) < target
 
             if needsBackfill {
+                // nil resume = first page (catch-up stopped mid-page on the head).
                 let resume = options.backfillCursor ?? catchUp.nextCursor
-                if let resume, !resume.isEmpty {
-                    result.stoppedAtKnownFrontier = false
-                    let backfill = try await runSyncPass(
-                        transport: transport,
-                        options: options,
-                        result: &result,
-                        target: target,
-                        pages: &pages,
-                        pageBudget: maxDeepBackfillPages,
-                        startCursor: resume,
-                        stopAfterSkipStreak: true
-                    )
-                    result.reachedEndOfRemoteList = backfill.reachedRemoteEnd
-                    result.newBackfillCursor = backfill.reachedRemoteEnd ? nil : backfill.nextCursor
-                } else {
-                    result.reachedEndOfRemoteList = catchUp.reachedRemoteEnd
-                    result.newBackfillCursor = catchUp.nextCursor
-                }
+                result.stoppedAtKnownFrontier = false
+                let backfill = try await runSyncPass(
+                    transport: transport,
+                    options: options,
+                    result: &result,
+                    target: target,
+                    pages: &pages,
+                    pageBudget: maxDeepBackfillPages,
+                    startCursor: resume,
+                    stopAfterSkipStreak: false
+                )
+                result.reachedEndOfRemoteList = backfill.reachedRemoteEnd
+                // Always advance the cursor so the next refresh continues past skipped pages.
+                result.newBackfillCursor = backfill.reachedRemoteEnd ? nil : backfill.nextCursor
             } else {
                 result.reachedEndOfRemoteList = catchUp.reachedRemoteEnd
-                // Catch-up frontier means the library head is synced; treat as complete
-                // for normal refresh so we don't keep planning deep scans.
-                if catchUp.stoppedAtSkipStreak || catchUp.reachedRemoteEnd {
-                    result.reachedEndOfRemoteList = catchUp.reachedRemoteEnd
-                    if catchUp.stoppedAtSkipStreak, result.imported + result.restored == 0 {
-                        // No new head items and we hit known locals — backfill can wait
-                        // for an explicit deep sync. Keep prior cursor if any.
-                        result.newBackfillCursor = options.backfillCursor
-                    } else {
-                        result.newBackfillCursor = options.backfillCursor ?? catchUp.nextCursor
-                    }
+                if catchUp.reachedRemoteEnd {
+                    result.newBackfillCursor = nil
+                } else if options.backfillComplete {
+                    result.newBackfillCursor = nil
                 } else {
+                    // Preserve / seed resume point after catch-up-only runs.
                     result.newBackfillCursor = options.backfillCursor ?? catchUp.nextCursor
                 }
             }
@@ -313,8 +306,9 @@ final class BookmarkSyncService {
                                skipAlreadySynced: true,
                                consecutiveSkips: localStreak
                            ) {
+                            // Finish the rest of this page so mid-page holes aren't
+                            // skipped when backfill resumes at the next page token.
                             hitSkipStreak = true
-                            break
                         }
                         continue
                     }

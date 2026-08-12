@@ -1,0 +1,16 @@
+---
+description: Keep progress.md and Handoff.md local-only; never commit them
+alwaysApply: true
+---
+
+# Local session notes — do not commit
+
+`progress.md` and `Handoff.md` at the repo root are **local agent handoff notes**.
+
+## Rules
+
+- Write or update them when the user asks for progress / handoff docs.
+- **Never** `git add` or commit `progress.md` or `Handoff.md`.
+- Keep both listed in `.gitignore` under “Local agent session notes”.
+- If they show up as untracked, fix `.gitignore` instead of staging them.
+- Do not move their content into README or other tracked docs unless the user explicitly asks.

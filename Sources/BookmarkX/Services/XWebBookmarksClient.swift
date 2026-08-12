@@ -38,12 +38,20 @@ actor XWebBookmarksClient {
                     count: clamped,
                     cursor: cursor
                 )
-                // Empty first page from a stale op — try the next candidate.
+                // Empty first page: Bookmarks with no items is a real empty library.
+                // Other ops may return empty when stale — try the next candidate.
                 if page.tweets.isEmpty, cursor == nil {
+                    if candidate.name == "Bookmarks" {
+                        preferredOperationName = candidate.name
+                        return page
+                    }
                     lastError = XWebSessionError.invalidResponse
                     continue
                 }
-                preferredOperationName = candidate.name
+                // Prefer sticking to Bookmarks; Search can hide new items / reorder.
+                if candidate.name == "Bookmarks" || preferredOperationName == nil {
+                    preferredOperationName = candidate.name
+                }
                 return page
             } catch {
                 lastError = error
