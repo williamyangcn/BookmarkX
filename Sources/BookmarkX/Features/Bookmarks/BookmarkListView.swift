@@ -550,24 +550,12 @@ private struct BookmarkRowView: View {
     }
 
     private var authorAvatar: some View {
-        Group {
-            if let urlString = item.authorProfileImageURL,
-               let url = URL(string: urlString) {
-                AsyncImage(url: url) { phase in
-                    switch phase {
-                    case .success(let image):
-                        image
-                            .resizable()
-                            .scaledToFill()
-                    default:
-                        avatarFallback
-                    }
-                }
-            } else {
-                avatarFallback
-            }
-        }
-        .frame(width: 40, height: 40)
+        CachedAsyncImage(
+            url: item.authorProfileImageURL.flatMap(URL.init(string:)),
+            width: 40,
+            height: 40,
+            fallback: { AnyView(avatarFallback) }
+        )
         .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
     }
 

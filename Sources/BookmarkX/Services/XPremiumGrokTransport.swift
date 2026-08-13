@@ -1,9 +1,8 @@
 import Foundation
 
-/// Uses X Premium Grok quota via the signed-in X web session (preferred),
-/// with OAuth access-token fallback when available.
+/// Premium Grok via the signed-in X web session only.
+/// Never send an X OAuth access token to api.x.ai — that is not an xAI API key.
 struct XPremiumGrokTransport: Sendable {
-    var accessToken: String?
     var webSession: XWebSession?
     var username: String?
     var model: String
@@ -15,44 +14,21 @@ struct XPremiumGrokTransport: Sendable {
         authorUsername: String?,
         existingFolders: [String] = []
     ) async throws -> GrokPayload {
-        if let webSession {
-            do {
-                return try await XWebSessionClient(session: session).enrichWithPremiumGrok(
-                    session: webSession,
-                    tweetText: tweetText,
-                    authorUsername: authorUsername,
-                    outputLanguage: outputLanguage,
-                    model: preferredPremiumModel,
-                    existingFolders: existingFolders
-                )
-            } catch {
-                // Fall through to OAuth token attempt if present.
-                if accessToken == nil {
-                    throw GrokError.premiumUnavailable(error.localizedDescription)
-                }
-            }
-        }
-
-        guard let accessToken, !accessToken.isEmpty else {
+        guard let webSession else {
             throw GrokError.premiumRequiresX
         }
 
         do {
-            return try await XAIAPITransport(
-                apiKey: accessToken,
-                model: preferredPremiumModel,
-                outputLanguage: outputLanguage,
-                session: session
-            ).enrich(
+            return try await XWebSessionClient(session: session).enrichWithPremiumGrok(
+                session: webSession,
                 tweetText: tweetText,
                 authorUsername: authorUsername,
+                outputLanguage: outputLanguage,
+                model: preferredPremiumModel,
                 existingFolders: existingFolders
             )
-        } catch GrokError.server(let statusCode, let message) where [401, 403, 404].contains(statusCode) {
-            throw GrokError.premiumUnavailable(
-                AppLocalization.format("grok.error.premiumRejectedFormat", "HTTP \(statusCode): \(message)"
-                )
-            )
+        } catch {
+            throw GrokError.premiumUnavailable(error.localizedDescription)
         }
     }
 

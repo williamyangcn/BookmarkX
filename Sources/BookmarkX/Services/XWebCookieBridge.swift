@@ -6,6 +6,10 @@ enum XWebCookieBridge {
     static let safariUserAgent =
         "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.2 Safari/605.1.15"
 
+    /// Isolated store for post preview so login/logout does not share disk cookies with `.default()`.
+    @MainActor
+    static let previewDataStore = WKWebsiteDataStore.nonPersistent()
+
     @MainActor
     static func applySavedSession(to cookieStore: WKHTTPCookieStore) async {
         guard let session = try? XWebSessionStore.load() else { return }
@@ -20,6 +24,20 @@ enum XWebCookieBridge {
                 await cookieStore.setCookie(cookie)
             }
         }
+    }
+
+    @MainActor
+    static func clearSessionData() async {
+        let types: Set<String> = [
+            WKWebsiteDataTypeCookies,
+            WKWebsiteDataTypeLocalStorage,
+            WKWebsiteDataTypeSessionStorage,
+            WKWebsiteDataTypeDiskCache,
+            WKWebsiteDataTypeMemoryCache
+        ]
+        let cutoff = Date.distantPast
+        await WKWebsiteDataStore.default().removeData(ofTypes: types, modifiedSince: cutoff)
+        await previewDataStore.removeData(ofTypes: types, modifiedSince: cutoff)
     }
 
     private static func makeCookies(session: XWebSession, domain: String) -> [HTTPCookie] {

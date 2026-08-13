@@ -10,6 +10,10 @@ struct BookmarkXApp: App {
                 .environment(appModel)
                 .environment(\.locale, appModel.settings.interfaceLanguage.locale)
                 .task {
+                    URLCache.shared = URLCache(
+                        memoryCapacity: 20 * 1024 * 1024,
+                        diskCapacity: 50 * 1024 * 1024
+                    )
                     await appModel.bootstrap()
                 }
                 .onOpenURL { url in

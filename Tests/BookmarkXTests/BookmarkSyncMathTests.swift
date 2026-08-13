@@ -72,4 +72,51 @@ final class BookmarkSyncMathTests: XCTestCase {
         )
         XCTAssertEqual(BookmarkSyncMath.catchUpSkipStreak, 8)
     }
+
+    func testEmptyPageIsEOFOnlyWithoutANewCursor() {
+        XCTAssertTrue(
+            BookmarkSyncMath.isRemoteEnd(
+                tweetsEmpty: true,
+                nextToken: nil,
+                currentToken: "cursor-a"
+            )
+        )
+        XCTAssertTrue(
+            BookmarkSyncMath.isRemoteEnd(
+                tweetsEmpty: true,
+                nextToken: "cursor-a",
+                currentToken: "cursor-a"
+            )
+        )
+        XCTAssertFalse(
+            BookmarkSyncMath.isRemoteEnd(
+                tweetsEmpty: true,
+                nextToken: "cursor-b",
+                currentToken: "cursor-a"
+            ),
+            "A new cursor on an empty page is a hole, not the end of the remote list"
+        )
+        XCTAssertFalse(
+            BookmarkSyncMath.isRemoteEnd(
+                tweetsEmpty: false,
+                nextToken: nil,
+                currentToken: nil
+            )
+        )
+    }
+
+    func testFolderResolveDoesNotMapShortSubstring() {
+        XCTAssertEqual(
+            LocalBookmarkClassifier.resolveCategory("投资", existingFolders: ["商业与投资"]),
+            "投资"
+        )
+        XCTAssertEqual(
+            LocalBookmarkClassifier.resolveCategory("游戏", existingFolders: ["游戏娱乐"]),
+            "游戏"
+        )
+        XCTAssertEqual(
+            LocalBookmarkClassifier.resolveCategory("前端开发", existingFolders: ["前端开发"]),
+            "前端开发"
+        )
+    }
 }

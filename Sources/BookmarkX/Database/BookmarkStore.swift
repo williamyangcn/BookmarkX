@@ -20,7 +20,15 @@ final class BookmarkStore {
         self.database = database
     }
 
+    @ObservationIgnored
+    private var reloadGeneration = 0
+
     func reload(searchText: String = "") async throws {
+        reloadGeneration += 1
+        let generation = reloadGeneration
+        try await Task.sleep(for: .milliseconds(16))
+        guard generation == reloadGeneration else { return }
+
         let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
         let snapshot = try await database.dbWriter.read { db in
             try BookmarkQueries.loadSnapshot(db: db, searchText: query)

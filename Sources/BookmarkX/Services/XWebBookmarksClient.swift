@@ -30,6 +30,7 @@ actor XWebBookmarksClient {
         }
 
         var lastError: Error?
+        var emptyBookmarksPage: BookmarkPage?
         for candidate in candidates {
             do {
                 let page = try await fetch(
@@ -38,24 +39,35 @@ actor XWebBookmarksClient {
                     count: clamped,
                     cursor: cursor
                 )
-                // Empty first page: Bookmarks with no items is a real empty library.
-                // Other ops may return empty when stale — try the next candidate.
-                if page.tweets.isEmpty, cursor == nil {
-                    if candidate.name == "Bookmarks" {
-                        preferredOperationName = candidate.name
-                        return page
+                if page.tweets.isEmpty {
+                    if cursor == nil {
+                        if candidate.name == "Bookmarks" {
+                            // Might be a true empty library — try other ops first.
+                            emptyBookmarksPage = page
+                        }
+                        lastError = XWebSessionError.invalidResponse
+                        continue
                     }
-                    lastError = XWebSessionError.invalidResponse
-                    continue
+                    // Paginated empty: don't sticky Search; try remaining candidates.
+                    if candidate.name != "Bookmarks" {
+                        lastError = XWebSessionError.invalidResponse
+                        continue
+                    }
+                    preferredOperationName = "Bookmarks"
+                    return page
                 }
-                // Prefer sticking to Bookmarks; Search can hide new items / reorder.
-                if candidate.name == "Bookmarks" || preferredOperationName == nil {
+                if candidate.name == "Bookmarks" {
                     preferredOperationName = candidate.name
                 }
                 return page
             } catch {
                 lastError = error
             }
+        }
+
+        if let emptyBookmarksPage {
+            preferredOperationName = "Bookmarks"
+            return emptyBookmarksPage
         }
 
         throw lastError ?? XWebSessionError.invalidResponse
@@ -209,8 +221,12 @@ actor XWebBookmarksClient {
             for (key, value) in discovered {
                 merged[key] = value
             }
+            let bookmarksChanged = merged["Bookmarks"] != fallback["Bookmarks"]
             self.cachedQueryIDs = merged
             self.saveCachedQueryIDs(merged)
+            if bookmarksChanged {
+                self.preferredOperationName = nil
+            }
         }
 
         return fallback
@@ -325,7 +341,11 @@ actor XWebBookmarksClient {
         }
         if let errors = root["errors"] as? [[String: Any]],
            let message = errors.first?["message"] as? String {
-            throw XWebSessionError.server(statusCode: 400, message: message)
+            let ordered = parseOrderedTimelineTweets(from: root)
+            if ordered.isEmpty {
+                throw XWebSessionError.server(statusCode: 400, message: message)
+            }
+            return ordered
         }
 
         // Timeline entry order is newest-first. A raw recursive walk shuffles that
@@ -474,7 +494,7 @@ actor XWebBookmarksClient {
         let name = (userLegacy?["name"] as? String) ?? username
         let avatar = userLegacy?["profile_image_url_https"] as? String
 
-        let createdAt = parseTwitterDate(legacy["created_at"] as? String) ?? Date()
+        let createdAt = Self.parseTwitterDate(legacy["created_at"] as? String) ?? Date()
         let metrics = legacy["favorite_count"] as? Int
 
         return RemoteBookmarkTweet(
@@ -491,9 +511,36 @@ actor XWebBookmarksClient {
             replyCount: (legacy["reply_count"] as? Int) ?? 0,
             quoteCount: (legacy["quote_count"] as? Int) ?? 0,
             conversationID: legacy["conversation_id_str"] as? String,
-            media: [],
+            media: parseMedia(from: legacy),
             rawJSON: nil
         )
+    }
+
+    private static func parseMedia(from legacy: [String: Any]) -> [RemoteMedia] {
+        let extended = (legacy["extended_entities"] as? [String: Any])?["media"] as? [[String: Any]]
+        let basic = (legacy["entities"] as? [String: Any])?["media"] as? [[String: Any]]
+        let items = extended ?? basic ?? []
+        return items.compactMap { item in
+            let id = (item["id_str"] as? String) ?? (item["media_key"] as? String)
+            guard let id, !id.isEmpty else { return nil }
+            let type = (item["type"] as? String) ?? "photo"
+            let url = (item["media_url_https"] as? String) ?? (item["media_url"] as? String)
+            let videoURL = ((item["video_info"] as? [String: Any])?["variants"] as? [[String: Any]])
+                .flatMap { variants in
+                    variants
+                        .compactMap { $0["url"] as? String }
+                        .first
+                }
+            let original = item["original_info"] as? [String: Any]
+            return RemoteMedia(
+                id: id,
+                type: type,
+                url: videoURL ?? url,
+                previewImageURL: url,
+                width: original?["width"] as? Int,
+                height: original?["height"] as? Int
+            )
+        }
     }
 
     /// Snowflake IDs are digits only. Reject t.co / URL false positives from GraphQL walks.
@@ -501,12 +548,16 @@ actor XWebBookmarksClient {
         !value.isEmpty && value.unicodeScalars.allSatisfy(CharacterSet.decimalDigits.contains)
     }
 
-    private static func parseTwitterDate(_ value: String?) -> Date? {
-        guard let value else { return nil }
+    private static let twitterDateFormatter: DateFormatter = {
         let formatter = DateFormatter()
         formatter.locale = Locale(identifier: "en_US_POSIX")
         formatter.dateFormat = "EEE MMM dd HH:mm:ss Z yyyy"
-        return formatter.date(from: value)
+        return formatter
+    }()
+
+    private static func parseTwitterDate(_ value: String?) -> Date? {
+        guard let value else { return nil }
+        return twitterDateFormatter.date(from: value)
     }
 
     // MARK: - Auth / helpers

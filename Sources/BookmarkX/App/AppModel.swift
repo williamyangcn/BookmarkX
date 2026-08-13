@@ -36,11 +36,6 @@ final class AppModel {
 
     @ObservationIgnored
     private var autoReadTask: Task<Void, Never>?
-    /// When enrichment is already running, coalesce another pass instead of dropping it.
-    @ObservationIgnored
-    private var enrichRerunRequested = false
-    @ObservationIgnored
-    private var enrichRerunForceLocal = false
 
     /// Items marked read during the current Inbox visit — stay visible until next Inbox entry.
     private(set) var inboxSessionRetainedIDs: Set<String> = []
@@ -123,7 +118,7 @@ final class AppModel {
             // Folders/titles first via local classifier (fast), then optional Grok upgrade.
             await enrichPendingBookmarks(forceLocal: true)
             if connectionStatus.isGrokConfigured {
-                Task { await upgradeLocalEnrichmentsWithGrok() }
+                await upgradeLocalEnrichmentsWithGrok()
             }
         } catch {
             syncStatusMessage = error.localizedDescription
@@ -146,95 +141,96 @@ final class AppModel {
     /// active synced bookmarks. Existing rows are picked up once by `processed_at`.
     /// - Parameter forceLocal: Prefer the local classifier so folders appear immediately.
     func enrichPendingBookmarks(forceLocal: Bool = false) async {
-        if isEnriching {
-            requestEnrichRerun(forceLocal: forceLocal)
-            return
-        }
-        guard let bookmarkStore else { return }
-
-        isEnriching = true
-        defer { isEnriching = false }
-
-        var useForceLocal = forceLocal
-        repeat {
-            enrichRerunRequested = false
-            do {
-                if !useForceLocal {
-                    await configureGrokClient()
-                }
-                let items = try await bookmarkStore.pendingEnrichmentItems()
-                if !items.isEmpty {
-                    let useLocal = useForceLocal || !connectionStatus.isGrokConfigured
-                    await runEnrichment(items: items, forceLocal: useLocal)
-                }
-            } catch {
-                syncStatusMessage = error.localizedDescription
-            }
-            if enrichRerunRequested {
-                useForceLocal = enrichRerunForceLocal
-            }
-        } while enrichRerunRequested
+        enqueueEnrichment(forceLocal ? .pendingLocal : .pendingGrok)
+        await runEnrichmentPump()
     }
 
     /// Re-run Grok over rows that only received the local fallback after sync.
     func upgradeLocalEnrichmentsWithGrok() async {
         guard connectionStatus.isGrokConfigured else { return }
-        guard let bookmarkStore else { return }
-        if isEnriching {
-            requestEnrichRerun(forceLocal: false)
-            return
-        }
+        enqueueEnrichment(.grokUpgrade)
+        await runEnrichmentPump()
+    }
 
+    private enum EnrichmentJob: Equatable {
+        case pendingLocal
+        case pendingGrok
+        case grokUpgrade
+        case reclassify
+    }
+
+    @ObservationIgnored
+    private var pendingEnrichmentJobs: [EnrichmentJob] = []
+
+    private func enqueueEnrichment(_ job: EnrichmentJob) {
+        if !pendingEnrichmentJobs.contains(job) {
+            pendingEnrichmentJobs.append(job)
+        }
+    }
+
+    private func runEnrichmentPump() async {
+        guard !isEnriching else { return }
+        guard bookmarkStore != nil else { return }
         isEnriching = true
         defer { isEnriching = false }
 
-        do {
-            await configureGrokClient()
-            let items = try await bookmarkStore.localFallbackEnrichmentItems()
-            if !items.isEmpty {
-                await runEnrichment(items: items, forceLocal: false)
-            }
-        } catch {
-            syncStatusMessage = error.localizedDescription
-        }
-
-        // Drain any pending/coalesced enrich that arrived while upgrading.
-        while enrichRerunRequested {
-            let againLocal = enrichRerunForceLocal
-            enrichRerunRequested = false
-            do {
-                if !againLocal {
-                    await configureGrokClient()
-                }
-                let items = try await bookmarkStore.pendingEnrichmentItems()
-                if !items.isEmpty {
-                    let useLocal = againLocal || !connectionStatus.isGrokConfigured
-                    await runEnrichment(items: items, forceLocal: useLocal)
-                }
-            } catch {
-                syncStatusMessage = error.localizedDescription
+        while let job = pendingEnrichmentJobs.first {
+            pendingEnrichmentJobs.removeFirst()
+            switch job {
+            case .pendingLocal:
+                await enrichPendingPass(forceLocal: true)
+            case .pendingGrok:
+                await enrichPendingPass(forceLocal: false)
+            case .grokUpgrade:
+                await grokUpgradePass()
+            case .reclassify:
+                await reclassifyPass()
             }
         }
     }
 
-    private func requestEnrichRerun(forceLocal: Bool) {
-        if !enrichRerunRequested {
-            enrichRerunForceLocal = forceLocal
-        } else {
-            enrichRerunForceLocal = enrichRerunForceLocal && forceLocal
+    private func enrichPendingPass(forceLocal: Bool) async {
+        guard let bookmarkStore else { return }
+        do {
+            if !forceLocal {
+                await configureGrokClient()
+            }
+            let items = try await bookmarkStore.pendingEnrichmentItems()
+            if !items.isEmpty {
+                let useLocal = forceLocal || !connectionStatus.isGrokConfigured
+                await runEnrichment(items: items, forceLocal: useLocal)
+            }
+        } catch {
+            syncStatusMessage = error.localizedDescription
         }
-        enrichRerunRequested = true
+    }
+
+    private func grokUpgradePass() async {
+        guard connectionStatus.isGrokConfigured else { return }
+        guard let bookmarkStore else { return }
+        do {
+            await configureGrokClient()
+            var remaining = 500
+            while remaining > 0 {
+                let items = try await bookmarkStore.localFallbackEnrichmentItems()
+                guard !items.isEmpty else { break }
+                await runEnrichment(items: items, forceLocal: false)
+                remaining -= items.count
+            }
+        } catch {
+            syncStatusMessage = error.localizedDescription
+        }
     }
 
     /// Re-run classification for every downloaded bookmark so folders rebuild from content.
     /// Uses the local taxonomy (fast / deterministic). Safe to call repeatedly.
     func reclassifyAllBookmarks() async {
-        guard !isEnriching else { return }
+        enqueueEnrichment(.reclassify)
+        await runEnrichmentPump()
+    }
+
+    private func reclassifyPass() async {
         guard let bookmarkStore else { return }
-
-        isEnriching = true
-        defer { isEnriching = false }
-
         do {
             let items = try await bookmarkStore.allEnrichmentItems()
             guard !items.isEmpty else {
@@ -256,15 +252,16 @@ final class AppModel {
         var completed = 0
         var failed = 0
         var firstError: String?
-        var useLocalFallback = forceLocal
+        var consecutiveGrokFailures = 0
         var existingFolders = (try? await bookmarkStore.folderNames()) ?? []
 
-        for item in items {
+        for (index, item) in items.enumerated() {
             syncStatusMessage = AppLocalization.format("enrichment.status.runningFormat", completed + failed + 1,
                 items.count)
             do {
                 var enrichment: GrokEnrichment
-                if useLocalFallback {
+                let preferLocal = forceLocal || consecutiveGrokFailures >= 3
+                if preferLocal {
                     enrichment = LocalBookmarkClassifier.enrich(
                         text: item.text,
                         authorUsername: item.authorUsername,
@@ -282,8 +279,9 @@ final class AppModel {
                             enrichment.category,
                             existingFolders: existingFolders
                         )
+                        consecutiveGrokFailures = 0
                     } catch {
-                        useLocalFallback = true
+                        consecutiveGrokFailures += 1
                         Self.logger.error(
                             "Grok unavailable; using local classifier: \(error.localizedDescription, privacy: .public)"
                         )
@@ -318,6 +316,9 @@ final class AppModel {
                     existingFolders.append(enrichment.category)
                 }
                 completed += 1
+                if (index + 1).isMultiple(of: 50) {
+                    try? await bookmarkStore.reload(searchText: searchText)
+                }
             } catch {
                 failed += 1
                 if firstError == nil {
