@@ -62,6 +62,18 @@ enum BookmarkSyncMath {
     ) -> Bool {
         skipAlreadySynced && consecutiveSkips >= threshold
     }
+
+    /// Empty tweets are EOF only when pagination cannot continue.
+    /// A mid-list empty page with a new cursor is a hole, not the end of X.
+    static func isRemoteEnd(
+        tweetsEmpty: Bool,
+        nextToken: String?,
+        currentToken: String?
+    ) -> Bool {
+        guard tweetsEmpty else { return false }
+        guard let next = nextToken, !next.isEmpty else { return true }
+        return next == currentToken
+    }
 }
 
 private enum SyncTransport {
@@ -102,6 +114,17 @@ final class BookmarkSyncService {
     func configureAPI() async throws {
         let store = KeychainStore.shared
 
+        if var webSession = try XWebSessionStore.load() {
+            if webSession.userID?.isEmpty != false {
+                if let verified = try? await XWebSessionClient().verify(session: webSession) {
+                    webSession = verified
+                    try XWebSessionStore.save(webSession)
+                }
+            }
+            transport = .web(webBookmarksClient, webSession)
+            return
+        }
+
         if
             let accessToken = try store.load(.xAccessToken), !accessToken.isEmpty,
             let userID = try store.load(.xUserID), !userID.isEmpty
@@ -118,18 +141,7 @@ final class BookmarkSyncService {
             return
         }
 
-        guard var webSession = try XWebSessionStore.load() else {
-            throw XAPIError.notConfigured
-        }
-
-        if webSession.userID?.isEmpty != false {
-            if let verified = try? await XWebSessionClient().verify(session: webSession) {
-                webSession = verified
-                try XWebSessionStore.save(webSession)
-            }
-        }
-
-        transport = .web(webBookmarksClient, webSession)
+        throw XAPIError.notConfigured
     }
 
     func sync(options: BookmarkSyncOptions) async throws -> BookmarkSyncResult {
@@ -163,10 +175,9 @@ final class BookmarkSyncService {
             // Phase 2: continue older pages until batch is filled or page budget hits.
             // Do NOT early-stop on skips here — local head is contiguous; older holes sit below.
             let needsBackfill = options.deepBackfill
-                && options.skipAlreadySynced
                 && !options.backfillComplete
                 && !catchUp.reachedRemoteEnd
-                && BookmarkSyncMath.batchProgress(result, skipAlreadySynced: true) < target
+                && BookmarkSyncMath.batchProgress(result, skipAlreadySynced: options.skipAlreadySynced) < target
 
             if needsBackfill {
                 // nil resume = first page (catch-up stopped mid-page on the head).
@@ -250,6 +261,7 @@ final class BookmarkSyncService {
 
             phase = .fetching
             onProgress?(pages, result)
+            await Task.yield()
 
             let page = try await fetchPage(
                 transport: transport,
@@ -257,10 +269,21 @@ final class BookmarkSyncService {
                 paginationToken: paginationToken
             )
 
-            if page.tweets.isEmpty {
+            if BookmarkSyncMath.isRemoteEnd(
+                tweetsEmpty: page.tweets.isEmpty,
+                nextToken: page.nextToken,
+                currentToken: paginationToken
+            ) {
                 outcome.reachedRemoteEnd = true
                 outcome.nextCursor = nil
                 break
+            }
+
+            if page.tweets.isEmpty {
+                // Hole / stale page: advance past it instead of marking backfill complete.
+                paginationToken = page.nextToken
+                outcome.nextCursor = page.nextToken
+                continue
             }
 
             result.fetched += page.tweets.count
@@ -370,7 +393,7 @@ final class BookmarkSyncService {
             }
 
             if BookmarkSyncMath.batchProgress(result, skipAlreadySynced: options.skipAlreadySynced) >= target {
-                outcome.nextCursor = paginationToken ?? page.nextToken
+                outcome.nextCursor = page.nextToken ?? paginationToken
                 break
             }
 

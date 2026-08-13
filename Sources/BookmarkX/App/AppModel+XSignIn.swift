@@ -52,7 +52,7 @@ extension AppModel {
     /// Inject saved X cookies into the shared WKWebView store (used by post preview).
     func seedPreviewWebSession() async {
         await XWebCookieBridge.applySavedSession(
-            to: WKWebsiteDataStore.default().httpCookieStore
+            to: XWebCookieBridge.previewDataStore.httpCookieStore
         )
     }
 
@@ -65,6 +65,20 @@ extension AppModel {
         try? KeychainStore.shared.clearXCredentials()
         settings.resetSyncProgress()
         connectionStatus.refresh(from: settings)
-        Task { await configureGrokClient() }
+        Task {
+            await XWebCookieBridge.clearSessionData()
+            await configureGrokClient()
+        }
+    }
+
+    func clearAllCredentials() {
+        XOAuthCallbackHub.cancel()
+        try? KeychainStore.shared.clearAll()
+        settings.resetSyncProgress()
+        connectionStatus.refresh(from: settings)
+        Task {
+            await XWebCookieBridge.clearSessionData()
+            await configureGrokClient()
+        }
     }
 }

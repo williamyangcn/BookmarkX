@@ -6,7 +6,8 @@ struct SettingsView: View {
     @State private var statusMessage: String?
     @State private var isSigningIn = false
     @State private var isTestingGrok = false
-    @State private var showAdvanced = false
+    @State private var showAdvancedX = false
+    @State private var showAdvancedGrok = false
     @State private var showEmbeddedLogin = false
 
     var body: some View {
@@ -46,7 +47,7 @@ struct SettingsView: View {
                             .buttonStyle(.link)
                         } else {
                             Button("auth.browserLogin.needsClientID") {
-                                showAdvanced = true
+                                showAdvancedX = true
                                 statusMessage = AppLocalization.text("auth.clientID.required")
                             }
                             .buttonStyle(.link)
@@ -55,7 +56,7 @@ struct SettingsView: View {
                     .padding(.vertical, 4)
                 }
 
-                DisclosureGroup("auth.advancedX", isExpanded: $showAdvanced) {
+                DisclosureGroup("auth.advancedX", isExpanded: $showAdvancedX) {
                     Text("auth.clientID.onceHelp")
                         .font(.caption)
                         .foregroundStyle(.secondary)
@@ -112,7 +113,7 @@ struct SettingsView: View {
                 Text("settings.grokFooter.premiumFirst")
             }
 
-            DisclosureGroup("auth.advancedOptional", isExpanded: $showAdvanced) {
+            DisclosureGroup("auth.advancedOptional", isExpanded: $showAdvancedGrok) {
                 SecureField("settings.grokAPIKey", text: $grokAPIKeyDraft)
                 Button("settings.saveGrokKey") {
                     saveGrokKey()
@@ -190,8 +191,8 @@ struct SettingsView: View {
                     Text("settings.localDatabaseValue")
                 }
                 Button("settings.clearCredentials", role: .destructive) {
-                    try? KeychainStore.shared.clearAll()
-                    refreshGrokState()
+                    appModel.clearAllCredentials()
+                    grokAPIKeyDraft = ""
                     statusMessage = AppLocalization.text("settings.credentialsCleared")
                 }
             }
@@ -209,7 +210,7 @@ struct SettingsView: View {
         .padding(.vertical, 4)
         .onAppear {
             grokAPIKeyDraft = (try? KeychainStore.shared.load(.grokAPIKey)) ?? ""
-            showAdvanced = settings.xClientID.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            showAdvancedX = settings.xClientID.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
             refreshGrokState()
         }
         .sheet(isPresented: $showEmbeddedLogin) {
@@ -249,7 +250,7 @@ struct SettingsView: View {
             case .cancelled:
                 statusMessage = AppLocalization.text("oauth.error.cancelled")
             case .missingClientID:
-                showAdvanced = true
+                showAdvancedX = true
                 statusMessage = AppLocalization.text("auth.clientID.required")
             case .failed(let message):
                 statusMessage = message
@@ -280,7 +281,7 @@ struct SettingsView: View {
         case .cancelled:
             statusMessage = AppLocalization.text("oauth.error.cancelled")
         case .missingClientID:
-            showAdvanced = true
+            showAdvancedX = true
             showEmbeddedLogin = true
             statusMessage = AppLocalization.text("auth.clientID.required")
         case .failed(let message):

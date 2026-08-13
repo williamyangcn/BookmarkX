@@ -315,11 +315,13 @@ enum LocalBookmarkClassifier {
             return alias
         }
 
-        // Prefer an existing folder that contains / is contained by the proposal.
-        if let fuzzy = existingFolders.first(where: {
+        // Prefer an existing folder with a shared prefix (min 4 chars). Avoid
+        // mapping "投资" → "商业与投资" via substring contains.
+        if lowered.count >= 4, let fuzzy = existingFolders.first(where: {
             let name = $0.lowercased()
-            return name.contains(lowered) || lowered.contains(name)
-        }), fuzzy.count >= 2 {
+            guard name.count >= 4 else { return false }
+            return name.hasPrefix(lowered) || lowered.hasPrefix(name)
+        }) {
             return fuzzy
         }
 
@@ -337,17 +339,40 @@ enum LocalBookmarkClassifier {
             + " "
     }
 
+    private final class RegexCache: @unchecked Sendable {
+        let lock = NSLock()
+        var map: [String: NSRegularExpression] = [:]
+    }
+
+    private static let regexCache = RegexCache()
+
     private static func containsTerm(_ haystack: String, _ keyword: String) -> Bool {
         let needle = keyword.lowercased()
         if needle.hasPrefix(" ") || needle.hasSuffix(" ") || needle.contains(" ") {
             return haystack.contains(needle)
         }
         if needle.count <= 3 {
-            // Short tokens: require non-letter boundaries to reduce false positives.
-            let pattern = #"(?<![a-z0-9\u4e00-\u9fff])"#
-                + NSRegularExpression.escapedPattern(for: needle)
-                + #"(?![a-z0-9\u4e00-\u9fff])"#
-            return haystack.range(of: pattern, options: .regularExpression) != nil
+            let cache = regexCache
+            cache.lock.lock()
+            let cached = cache.map[needle]
+            cache.lock.unlock()
+            let regex: NSRegularExpression
+            if let cached {
+                regex = cached
+            } else {
+                let pattern = #"(?<![a-z0-9\u4e00-\u9fff])"#
+                    + NSRegularExpression.escapedPattern(for: needle)
+                    + #"(?![a-z0-9\u4e00-\u9fff])"#
+                guard let compiled = try? NSRegularExpression(pattern: pattern) else {
+                    return haystack.contains(needle)
+                }
+                cache.lock.lock()
+                cache.map[needle] = compiled
+                cache.lock.unlock()
+                regex = compiled
+            }
+            let range = NSRange(haystack.startIndex..<haystack.endIndex, in: haystack)
+            return regex.firstMatch(in: haystack, options: [], range: range) != nil
         }
         return haystack.contains(needle)
     }

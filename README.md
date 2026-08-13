@@ -20,7 +20,7 @@ Local-first macOS app for X (Twitter) bookmarks — sync, organize, search, and 
   </a>
 </p>
 
-**Latest:** [v0.2.3](https://github.com/williamyangcn/BookmarkX/releases/tag/v0.2.3) · [Download `BookmarkX-0.2.3.dmg`](https://github.com/williamyangcn/BookmarkX/releases/latest)
+**Latest:** [v0.2.4](https://github.com/williamyangcn/BookmarkX/releases/tag/v0.2.4) · [Download `BookmarkX-0.2.4.dmg`](https://github.com/williamyangcn/BookmarkX/releases/latest)
 
 ### Screenshots / 截图
 
@@ -42,12 +42,19 @@ Local-first macOS app for X (Twitter) bookmarks — sync, organize, search, and 
 
 | Package | Link |
 | --- | --- |
-| **v0.2.3 DMG** | [Download `BookmarkX-0.2.3.dmg`](https://github.com/williamyangcn/BookmarkX/releases/latest) |
+| **v0.2.4 DMG** | [Download `BookmarkX-0.2.4.dmg`](https://github.com/williamyangcn/BookmarkX/releases/latest) |
 | All versions | [Releases page](https://github.com/williamyangcn/BookmarkX/releases) |
 
 1. Open the `.dmg` and drag **BookmarkX** into **Applications**.
 2. On first launch, macOS may ask you to allow an unsigned/ad-hoc build: **System Settings → Privacy & Security → Open Anyway**.
 3. Sign in with X inside the app, then click **Refresh** to sync bookmarks.
+
+### What’s new in 0.2.4
+
+- Sync no longer treats a mid-list empty page as “library finished”; stale Bookmarks IDs fall back before accepting an empty library
+- Enrichment jobs queue (local folders, Grok upgrade, reclassify) instead of dropping work
+- Sign-out clears WebKit cookies; post preview uses an isolated store; X OAuth tokens are never sent to x.ai
+- Faster list reloads, cached avatars, web-sync media import, and tighter folder matching
 
 ### What’s new in 0.2.3
 
@@ -111,7 +118,7 @@ xcodebuild -scheme BookmarkX -destination 'platform=macOS' test
 ```bash
 export DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer
 ./Scripts/package-dmg.sh          # → dist/BookmarkX-<version>.dmg
-./Scripts/package-dmg.sh 0.2.3    # optional version tag
+./Scripts/package-dmg.sh 0.2.4    # optional version tag
 ```
 
 Upload the DMG on [GitHub Releases](https://github.com/williamyangcn/BookmarkX/releases/new) so the Download badge above points at a real file.
@@ -141,12 +148,19 @@ Upload the DMG on [GitHub Releases](https://github.com/williamyangcn/BookmarkX/r
 
 | 安装包 | 链接 |
 | --- | --- |
-| **v0.2.3 DMG** | [下载 `BookmarkX-0.2.3.dmg`](https://github.com/williamyangcn/BookmarkX/releases/latest) |
+| **v0.2.4 DMG** | [下载 `BookmarkX-0.2.4.dmg`](https://github.com/williamyangcn/BookmarkX/releases/latest) |
 | 历史版本 | [Releases 页面](https://github.com/williamyangcn/BookmarkX/releases) |
 
 1. 打开 `.dmg`，把 **BookmarkX** 拖进 **应用程序**。
 2. 首次打开若被拦截：系统设置 → 隐私与安全性 → 仍要打开（当前为 ad-hoc 签名）。
 3. 在应用内用 X 登录，然后点 **刷新** 同步书签。
+
+### 0.2.4 更新
+
+- 同步中途空页不再误标「全量完成」；过期 Bookmarks 接口会先尝试备用再认定空库
+- 本地分类 / Grok 升级 / 全量重分类进入同一队列，不再互相丢请求
+- 退出登录清除 WebKit Cookie；预览用独立 cookie 仓；不再把 X OAuth token 发到 x.ai
+- 列表刷新合并、头像缓存、Web 同步导入媒体、文件夹匹配收紧
 
 ### 0.2.3 更新
 
@@ -210,7 +224,7 @@ xcodebuild -scheme BookmarkX -destination 'platform=macOS' test
 ```bash
 export DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer
 ./Scripts/package-dmg.sh          # 输出 dist/BookmarkX-<version>.dmg
-./Scripts/package-dmg.sh 0.2.3    # 可指定版本号
+./Scripts/package-dmg.sh 0.2.4    # 可指定版本号
 ```
 
 把生成的 DMG 上传到 [GitHub Releases](https://github.com/williamyangcn/BookmarkX/releases/new)，上方下载按钮即可指向真实安装包。

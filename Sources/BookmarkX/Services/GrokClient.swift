@@ -192,7 +192,6 @@ actor GrokClient {
         }
 
         let payload = try await XPremiumGrokTransport(
-            accessToken: snapshot.xAccessToken,
             webSession: snapshot.webSession,
             username: snapshot.xUsername,
             model: snapshot.model,

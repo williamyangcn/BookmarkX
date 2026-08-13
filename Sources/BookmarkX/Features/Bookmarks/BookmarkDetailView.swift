@@ -11,7 +11,11 @@ struct BookmarkDetailView: View {
     @State private var showWebPreview = true
 
     private var postURL: URL {
-        URL(string: "https://x.com/\(item.authorUsername)/status/\(item.tweetID)")!
+        var components = URLComponents()
+        components.scheme = "https"
+        components.host = "x.com"
+        components.path = "/\(item.authorUsername)/status/\(item.tweetID)"
+        return components.url ?? URL(string: "https://x.com/i/status/\(item.tweetID)")!
     }
 
     var body: some View {
@@ -231,7 +235,7 @@ private struct XPostWebView: NSViewRepresentable {
 
     func makeNSView(context: Context) -> WKWebView {
         let config = WKWebViewConfiguration()
-        config.websiteDataStore = .default()
+        config.websiteDataStore = XWebCookieBridge.previewDataStore
         config.preferences.javaScriptCanOpenWindowsAutomatically = true
         config.defaultWebpagePreferences.allowsContentJavaScript = true
 
@@ -253,20 +257,27 @@ private struct XPostWebView: NSViewRepresentable {
     final class Coordinator: NSObject, WKNavigationDelegate, WKUIDelegate {
         weak var webView: WKWebView?
         private var loadedURL: URL?
+        private var pendingURL: URL?
         private var isPreparing = false
 
         func load(url: URL) {
-            guard loadedURL != url || webView?.url == nil else { return }
-            loadedURL = url
+            pendingURL = url
             guard let webView else { return }
             guard !isPreparing else { return }
             isPreparing = true
-            Task {
+            Task { [weak self] in
+                guard let self else { return }
                 await XWebCookieBridge.applySavedSession(to: webView.configuration.websiteDataStore.httpCookieStore)
-                if loadedURL == url {
-                    webView.load(URLRequest(url: url))
+                while let target = self.pendingURL {
+                    self.pendingURL = nil
+                    self.loadedURL = target
+                    webView.load(URLRequest(url: target))
+                    await Task.yield()
                 }
-                isPreparing = false
+                self.isPreparing = false
+                if let queued = self.pendingURL {
+                    self.load(url: queued)
+                }
             }
         }
 

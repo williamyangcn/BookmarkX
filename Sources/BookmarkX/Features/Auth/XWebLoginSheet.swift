@@ -188,13 +188,13 @@ private struct XLoginWebView: NSViewRepresentable {
 
         func webViewDidClose(_ webView: WKWebView) {
             closePopupIfNeeded(webView)
-            Task { await checkCookies(autoComplete: true) }
+            Task { await checkCookies(autoComplete: false) }
         }
 
         func windowWillClose(_ notification: Notification) {
             popupWebView = nil
             popupWindow = nil
-            Task { await checkCookies(autoComplete: true) }
+            Task { await checkCookies(autoComplete: false) }
         }
 
         func webView(
@@ -216,7 +216,7 @@ private struct XLoginWebView: NSViewRepresentable {
         func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
             Task {
                 await softenGoogleEmbeddedWarnings(in: webView)
-                await checkCookies(autoComplete: true)
+                await checkCookies(autoComplete: false)
             }
 
             // Popup finished back on X → close it and land on home in the main view.
@@ -228,7 +228,7 @@ private struct XLoginWebView: NSViewRepresentable {
             // Main view returned to X after Google — nudge home for cookie settle.
             if webView === self.webView, let url = webView.url, isXHost(url),
                url.path.contains("/home") || url.path == "/" || url.path.isEmpty {
-                Task { await checkCookies(autoComplete: true) }
+                Task { await checkCookies(autoComplete: false) }
             }
         }
 
@@ -246,7 +246,7 @@ private struct XLoginWebView: NSViewRepresentable {
                 guard let self else { return }
                 for _ in 0..<240 {
                     if Task.isCancelled || didFinish { return }
-                    await checkCookies(autoComplete: true)
+                    await checkCookies(autoComplete: false)
                     try? await Task.sleep(nanoseconds: 1_000_000_000)
                 }
             }
