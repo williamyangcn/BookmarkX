@@ -45,18 +45,10 @@ struct OnboardingView: View {
                     .multilineTextAlignment(.center)
                     .frame(maxWidth: 420)
 
-                if hasClientID {
-                    Button("auth.embeddedLogin") {
-                        showEmbeddedLogin = true
-                    }
-                    .buttonStyle(.link)
-                } else {
-                    Button("auth.browserLogin.needsClientID") {
-                        showClientID = true
-                        statusMessage = AppLocalization.text("auth.clientID.required")
-                    }
-                    .buttonStyle(.link)
+                Button("auth.embeddedLogin") {
+                    showEmbeddedLogin = true
                 }
+                .buttonStyle(.link)
 
                 if showClientID {
                     VStack(alignment: .leading, spacing: 8) {
@@ -107,7 +99,7 @@ struct OnboardingView: View {
             )
         )
         .onAppear {
-            // Keep Client ID collapsed by default; primary login uses in-app session.
+            // Client ID card stays collapsed until the browser sign-in needs it.
             showClientID = false
         }
         .sheet(isPresented: $showEmbeddedLogin) {
@@ -146,7 +138,8 @@ struct OnboardingView: View {
         !appModel.settings.xClientID.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 
-    /// Prefer browser OAuth when Client ID is set; otherwise open in-app login (no Client ID).
+    /// Default path is in-app web login (no Developer Client ID). Browser OAuth
+    /// is used when a Client ID is already configured.
     private func signIn() async {
         if !hasClientID {
             statusMessage = nil
