@@ -50,9 +50,22 @@ final class BookmarkStore {
         }
     }
 
-    func createFolder(named name: String) throws {
+    @discardableResult
+    func createFolder(named name: String) throws -> String {
         try database.dbWriter.write { db in
             try BookmarkQueries.createFolder(db: db, named: name)
+        }
+    }
+
+    func addTag(tweetID: String, named name: String) throws {
+        try database.dbWriter.write { db in
+            try BookmarkQueries.attachTag(db: db, tweetID: tweetID, named: name, isAIGenerated: false)
+        }
+    }
+
+    func removeTag(tweetID: String, named name: String) throws {
+        try database.dbWriter.write { db in
+            try BookmarkQueries.detachTag(db: db, tweetID: tweetID, named: name)
         }
     }
 
@@ -309,9 +322,18 @@ enum BookmarkQueries {
         try refreshSearchIndex(db: db, tweetID: tweet.id)
     }
 
-    static func createFolder(db: Database, named name: String) throws {
+    @discardableResult
+    static func createFolder(db: Database, named name: String) throws -> String {
         let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else { return }
+        guard !trimmed.isEmpty else { return "" }
+
+        if let existingID = try String.fetchOne(
+            db,
+            sql: "SELECT id FROM folders WHERE name = ? COLLATE NOCASE LIMIT 1",
+            arguments: [trimmed]
+        ) {
+            return existingID
+        }
 
         let now = Date()
         let maxOrder = try Int.fetchOne(db, sql: "SELECT COALESCE(MAX(sort_order), -1) FROM folders") ?? -1
@@ -325,6 +347,65 @@ enum BookmarkQueries {
             updatedAt: now
         )
         try folder.insert(db)
+        return folder.id
+    }
+
+    static func attachTag(db: Database, tweetID: String, named name: String, isAIGenerated: Bool) throws {
+        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+
+        let now = Date()
+        let tagID: String
+        if let existingID = try String.fetchOne(
+            db,
+            sql: "SELECT id FROM tags WHERE name = ? COLLATE NOCASE LIMIT 1",
+            arguments: [trimmed]
+        ) {
+            tagID = existingID
+        } else {
+            tagID = UUID().uuidString
+            let tag = Tag(
+                id: tagID,
+                name: trimmed,
+                colorHex: nil,
+                createdAt: now,
+                updatedAt: now
+            )
+            try tag.insert(db)
+        }
+
+        if isAIGenerated {
+            try db.execute(
+                sql: """
+                INSERT OR IGNORE INTO bookmark_tags
+                    (tweet_id, tag_id, is_ai_generated)
+                VALUES (?, ?, 1)
+                """,
+                arguments: [tweetID, tagID]
+            )
+        } else {
+            try db.execute(
+                sql: """
+                INSERT INTO bookmark_tags (tweet_id, tag_id, is_ai_generated)
+                VALUES (?, ?, 0)
+                ON CONFLICT(tweet_id, tag_id) DO UPDATE SET is_ai_generated = 0
+                """,
+                arguments: [tweetID, tagID]
+            )
+        }
+        try refreshSearchIndex(db: db, tweetID: tweetID)
+    }
+
+    static func detachTag(db: Database, tweetID: String, named name: String) throws {
+        try db.execute(
+            sql: """
+            DELETE FROM bookmark_tags
+            WHERE tweet_id = ?
+              AND tag_id IN (SELECT id FROM tags WHERE name = ? COLLATE NOCASE)
+            """,
+            arguments: [tweetID, name]
+        )
+        try refreshSearchIndex(db: db, tweetID: tweetID)
     }
 
     static func moveBookmark(db: Database, tweetID: String, toFolderID folderID: String?) throws {
@@ -771,7 +852,7 @@ enum BookmarkQueries {
 
             try db.execute(
                 sql: """
-                INSERT OR REPLACE INTO bookmark_tags
+                INSERT OR IGNORE INTO bookmark_tags
                     (tweet_id, tag_id, is_ai_generated)
                 VALUES (?, ?, 1)
                 """,

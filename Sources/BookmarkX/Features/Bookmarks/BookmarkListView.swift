@@ -6,6 +6,12 @@ struct BookmarkListView: View {
     @State private var pendingDeleteID: String?
     @State private var filterTab: ListFilterTab = .all
     @FocusState private var isSearchFocused: Bool
+    @State private var newFolderDraft = ""
+    @State private var showNewFolderAlert = false
+    @State private var folderAlertTweetID: String?
+    @State private var newTagDraft = ""
+    @State private var showNewTagAlert = false
+    @State private var tagAlertTweetID: String?
 
     private enum ListFilterTab: String, CaseIterable, Identifiable {
         case all
@@ -99,6 +105,34 @@ struct BookmarkListView: View {
             }
         } message: {
             Text("bookmarks.delete.message")
+        }
+        .alert("folders.newSection", isPresented: $showNewFolderAlert) {
+            TextField("folders.newPlaceholder", text: $newFolderDraft)
+            Button("folders.create") {
+                let name = newFolderDraft.trimmingCharacters(in: .whitespacesAndNewlines)
+                let tweetID = folderAlertTweetID
+                newFolderDraft = ""
+                folderAlertTweetID = nil
+                guard !name.isEmpty else { return }
+                Task { await appModel.createFolder(named: name, movingTweetID: tweetID) }
+            }
+            Button("action.cancel", role: .cancel) {
+                folderAlertTweetID = nil
+            }
+        }
+        .alert("tags.add", isPresented: $showNewTagAlert) {
+            TextField("tags.addPlaceholder", text: $newTagDraft)
+            Button("tags.add") {
+                let name = newTagDraft.trimmingCharacters(in: .whitespacesAndNewlines)
+                let tweetID = tagAlertTweetID
+                newTagDraft = ""
+                tagAlertTweetID = nil
+                guard !name.isEmpty, let tweetID else { return }
+                Task { await appModel.addTag(tweetID: tweetID, named: name) }
+            }
+            Button("action.cancel", role: .cancel) {
+                tagAlertTweetID = nil
+            }
         }
     }
 
@@ -273,6 +307,20 @@ struct BookmarkListView: View {
 
             pillDivider
 
+            Menu {
+                tagMenu(for: selected)
+            } label: {
+                Image(systemName: "tag")
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundStyle(Color.primary.opacity(selected == nil ? 0.35 : 0.85))
+                    .frame(width: 30, height: 28)
+            }
+            .menuStyle(.borderlessButton)
+            .disabled(selected == nil)
+            .help(Text("tags.add"))
+
+            pillDivider
+
             actionIcon(
                 systemImage: "archivebox",
                 help: selected?.isArchived == true ? "bookmarks.unarchive" : "bookmarks.archive",
@@ -426,6 +474,10 @@ struct BookmarkListView: View {
             moveToFolderMenu(for: item)
         }
 
+        Menu("sidebar.tags") {
+            tagMenu(for: item)
+        }
+
         Button {
             Task { await appModel.setArchived(tweetID: item.tweetID, isArchived: !item.isArchived) }
         } label: {
@@ -476,6 +528,49 @@ struct BookmarkListView: View {
                 .disabled(item == nil)
             }
         }
+
+        Divider()
+        Button("folders.newSection") {
+            folderAlertTweetID = item?.tweetID
+            newFolderDraft = ""
+            showNewFolderAlert = true
+        }
+        .disabled(item == nil)
+    }
+
+    @ViewBuilder
+    private func tagMenu(for item: BookmarkListItem?) -> some View {
+        let existing = appModel.bookmarkStore?.tags ?? []
+        let attached = Set(item?.tags.map { $0.lowercased() } ?? [])
+
+        if !existing.isEmpty {
+            ForEach(existing) { tag in
+                Button {
+                    guard let item else { return }
+                    if attached.contains(tag.name.lowercased()) {
+                        Task { await appModel.removeTag(tweetID: item.tweetID, named: tag.name) }
+                    } else {
+                        Task { await appModel.addTag(tweetID: item.tweetID, named: tag.name) }
+                    }
+                } label: {
+                    HStack {
+                        Text(tag.name)
+                        if attached.contains(tag.name.lowercased()) {
+                            Image(systemName: "checkmark")
+                        }
+                    }
+                }
+                .disabled(item == nil)
+            }
+            Divider()
+        }
+
+        Button("tags.add") {
+            tagAlertTweetID = item?.tweetID
+            newTagDraft = ""
+            showNewTagAlert = true
+        }
+        .disabled(item == nil)
     }
 }
 
@@ -530,6 +625,12 @@ private struct BookmarkRowView: View {
                             .padding(.horizontal, 6)
                             .padding(.vertical, 2)
                             .background(.quaternary, in: Capsule())
+                    }
+                    ForEach(item.tags.prefix(3), id: \.self) { tag in
+                        Text("#\(tag)")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
                     }
                     if item.mediaCount > 0 {
                         Label("\(item.mediaCount)", systemImage: "paperclip")

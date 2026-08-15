@@ -438,6 +438,36 @@ final class AppModel {
         }
     }
 
+    func createFolder(named name: String, movingTweetID: String? = nil) async {
+        do {
+            guard let folderID = try bookmarkStore?.createFolder(named: name), !folderID.isEmpty else { return }
+            if let movingTweetID {
+                try bookmarkStore?.moveBookmark(tweetID: movingTweetID, toFolderID: folderID)
+            }
+            try await bookmarkStore?.reload(searchText: searchText)
+        } catch {
+            syncStatusMessage = error.localizedDescription
+        }
+    }
+
+    func addTag(tweetID: String, named name: String) async {
+        do {
+            try bookmarkStore?.addTag(tweetID: tweetID, named: name)
+            try await bookmarkStore?.reload(searchText: searchText)
+        } catch {
+            syncStatusMessage = error.localizedDescription
+        }
+    }
+
+    func removeTag(tweetID: String, named name: String) async {
+        do {
+            try bookmarkStore?.removeTag(tweetID: tweetID, named: name)
+            try await bookmarkStore?.reload(searchText: searchText)
+        } catch {
+            syncStatusMessage = error.localizedDescription
+        }
+    }
+
     func selectBookmark(_ tweetID: String?) {
         selectedBookmarkID = tweetID
         scheduleAutoRead(for: tweetID)

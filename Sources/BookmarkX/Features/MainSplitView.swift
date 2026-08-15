@@ -160,7 +160,6 @@ private struct ShortcutRailView: View {
 private struct MailFolderSidebar: View {
     @Environment(AppModel.self) private var appModel
     @State private var newFolderName = ""
-    @State private var isAddingFolder = false
     @FocusState private var isNewFolderFieldFocused: Bool
 
     var body: some View {
@@ -179,7 +178,7 @@ private struct MailFolderSidebar: View {
                 mailboxRow(.uncategorized, count: uncategorizedCount, color: .gray)
             }
 
-            Section {
+            Section("sidebar.folders") {
                 ForEach(folders) { folder in
                     HStack(spacing: 10) {
                         Circle()
@@ -196,42 +195,17 @@ private struct MailFolderSidebar: View {
                     .tag(SidebarItem.folder(folder.id))
                 }
 
-                if isAddingFolder {
-                    HStack(spacing: 8) {
-                        Image(systemName: "folder.badge.plus")
-                            .foregroundStyle(.secondary)
-                        TextField("folders.newPlaceholder", text: $newFolderName)
-                            .textFieldStyle(.plain)
-                            .focused($isNewFolderFieldFocused)
-                            .onSubmit(createFolder)
-                        Button(action: createFolder) {
-                            Image(systemName: "checkmark.circle.fill")
-                                .foregroundStyle(Color.accentColor)
-                        }
-                        .buttonStyle(.plain)
+                HStack(spacing: 8) {
+                    Image(systemName: "folder.badge.plus")
+                        .foregroundStyle(.secondary)
+                    TextField("folders.newPlaceholder", text: $newFolderName)
+                        .textFieldStyle(.roundedBorder)
+                        .focused($isNewFolderFieldFocused)
+                        .onSubmit(createFolder)
+                    Button("folders.create", action: createFolder)
                         .disabled(newFolderName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-                    }
-                    .padding(.vertical, 2)
                 }
-            } header: {
-                HStack {
-                    Text("sidebar.folders")
-                    Spacer()
-                    Button {
-                        withAnimation(.easeInOut(duration: 0.15)) {
-                            isAddingFolder.toggle()
-                        }
-                        if isAddingFolder {
-                            isNewFolderFieldFocused = true
-                        }
-                    } label: {
-                        Image(systemName: isAddingFolder ? "xmark" : "plus")
-                            .font(.caption.weight(.semibold))
-                            .foregroundStyle(.secondary)
-                    }
-                    .buttonStyle(.plain)
-                    .help(Text("folders.create"))
-                }
+                .padding(.vertical, 4)
             }
         }
         .listStyle(.sidebar)
@@ -241,10 +215,8 @@ private struct MailFolderSidebar: View {
     private func createFolder() {
         let name = newFolderName.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !name.isEmpty else { return }
-        try? appModel.bookmarkStore?.createFolder(named: name)
         newFolderName = ""
-        isAddingFolder = false
-        Task { await appModel.reloadBookmarks() }
+        Task { await appModel.createFolder(named: name) }
     }
 
     private func mailboxRow(

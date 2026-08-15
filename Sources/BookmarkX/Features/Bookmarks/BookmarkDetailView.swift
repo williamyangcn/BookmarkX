@@ -9,6 +9,7 @@ struct BookmarkDetailView: View {
     @State private var noteDraft: String = ""
     @State private var didLoadNote = false
     @State private var showWebPreview = true
+    @State private var newTagDraft = ""
 
     private var postURL: URL {
         var components = URLComponents()
@@ -21,6 +22,8 @@ struct BookmarkDetailView: View {
     var body: some View {
         VStack(spacing: 0) {
             headerBar
+            Divider()
+            tagEditorBar
             Divider()
             if showWebPreview {
                 XPostWebView(url: postURL)
@@ -107,6 +110,53 @@ struct BookmarkDetailView: View {
         .background(.bar)
     }
 
+    private var tagEditorBar: some View {
+        HStack(alignment: .center, spacing: 8) {
+            Image(systemName: "tag")
+                .foregroundStyle(.secondary)
+                .font(.system(size: 12, weight: .semibold))
+
+            WrappingHStack(spacing: 6) {
+                ForEach(item.tags, id: \.self) { tag in
+                    HStack(spacing: 4) {
+                        Text("#\(tag)")
+                            .font(.caption)
+                        Button {
+                            Task { await appModel.removeTag(tweetID: item.tweetID, named: tag) }
+                        } label: {
+                            Image(systemName: "xmark")
+                                .font(.system(size: 8, weight: .bold))
+                        }
+                        .buttonStyle(.plain)
+                        .help(Text("tags.remove"))
+                    }
+                    .padding(.horizontal, 7)
+                    .padding(.vertical, 3)
+                    .background(.quaternary, in: Capsule())
+                }
+
+                TextField("tags.addPlaceholder", text: $newTagDraft)
+                    .textFieldStyle(.plain)
+                    .frame(minWidth: 90, maxWidth: 160)
+                    .onSubmit(addDraftTag)
+            }
+
+            Button("tags.add", action: addDraftTag)
+                .disabled(newTagDraft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                .controlSize(.small)
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 8)
+        .background(.bar)
+    }
+
+    private func addDraftTag() {
+        let name = newTagDraft.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !name.isEmpty else { return }
+        newTagDraft = ""
+        Task { await appModel.addTag(tweetID: item.tweetID, named: name) }
+    }
+
     private var detailPillDivider: some View {
         Rectangle()
             .fill(Color.primary.opacity(0.12))
@@ -131,20 +181,6 @@ struct BookmarkDetailView: View {
                 if let category = item.category, !category.isEmpty {
                     LabeledContent("detail.category") {
                         Text(category)
-                    }
-                }
-
-                if !item.tags.isEmpty {
-                    LabeledContent("sidebar.tags") {
-                        HStack {
-                            ForEach(item.tags, id: \.self) { tag in
-                                Text("#\(tag)")
-                                    .font(.caption)
-                                    .padding(.horizontal, 7)
-                                    .padding(.vertical, 3)
-                                    .background(.quaternary, in: Capsule())
-                            }
-                        }
                     }
                 }
 
@@ -322,6 +358,45 @@ private struct XPostWebView: NSViewRepresentable {
             }
             decisionHandler(.allow)
         }
+    }
+}
+
+private struct WrappingHStack: Layout {
+    var spacing: CGFloat = 6
+
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        arrange(width: proposal.width ?? 400, subviews: subviews).size
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        let result = arrange(width: bounds.width, subviews: subviews)
+        for index in subviews.indices {
+            subviews[index].place(
+                at: CGPoint(x: bounds.minX + result.origins[index].x, y: bounds.minY + result.origins[index].y),
+                proposal: .unspecified
+            )
+        }
+    }
+
+    private func arrange(width: CGFloat, subviews: Subviews) -> (origins: [CGPoint], size: CGSize) {
+        var origins: [CGPoint] = []
+        var x: CGFloat = 0
+        var y: CGFloat = 0
+        var rowHeight: CGFloat = 0
+        var maxX: CGFloat = 0
+        for subview in subviews {
+            let size = subview.sizeThatFits(.unspecified)
+            if x > 0, x + size.width > width {
+                x = 0
+                y += rowHeight + spacing
+                rowHeight = 0
+            }
+            origins.append(CGPoint(x: x, y: y))
+            x += size.width + spacing
+            rowHeight = max(rowHeight, size.height)
+            maxX = max(maxX, x - spacing)
+        }
+        return (origins, CGSize(width: max(maxX, 0), height: y + rowHeight))
     }
 }
 
