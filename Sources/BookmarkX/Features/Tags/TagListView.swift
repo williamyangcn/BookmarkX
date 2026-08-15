@@ -11,7 +11,16 @@ struct TagListView: View {
                 ContentUnavailableView("tags.emptyTitle", systemImage: "tag", description: Text("tags.emptyDescription"))
             } else {
                 List(tags) { tag in
-                    Label(tag.name, systemImage: "tag")
+                    HStack(spacing: 10) {
+                        Image(systemName: "tag.fill")
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundStyle(Color(hex: tag.colorHex) ?? .accentColor)
+                            .frame(width: 20)
+                        Text(tag.name)
+                            .lineLimit(1)
+                        Spacer(minLength: 0)
+                    }
+                    .padding(.vertical, 3)
                 }
             }
         }

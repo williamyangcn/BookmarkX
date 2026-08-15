@@ -1,6 +1,6 @@
 # Selected App Icon
 
-- Style: B geometric layers
-- Colors: orange primary + blue accent
-- Master: `B-orange-blue/1024.png`
-- macOS sizes: `B-orange-blue/macOS/`
+- Style: close-up swallowtail bookmark ribbon forming the X mark
+- Colors: coral-orange paper on charcoal X-brand background
+- Master: `bookmarkx-icon-1024.png`
+- macOS sizes: `Sources/BookmarkX/Resources/Assets.xcassets/AppIcon.appiconset/`

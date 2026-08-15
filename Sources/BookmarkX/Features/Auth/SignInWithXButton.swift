@@ -13,8 +13,11 @@ struct SignInWithXButton: View {
                         .controlSize(.small)
                         .tint(.white)
                 } else {
-                    Image(systemName: "xmark")
-                        .font(.headline.weight(.black))
+                    Image("XLogo")
+                        .renderingMode(.template)
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: 15, height: 15)
                 }
                 Text(isLoading ? "settings.connectingX" : "auth.signInWithX")
                     .font(.headline)

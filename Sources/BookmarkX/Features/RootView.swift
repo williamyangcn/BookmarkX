@@ -2,6 +2,9 @@ import SwiftUI
 
 struct RootView: View {
     @Environment(AppModel.self) private var appModel
+    #if DEBUG
+    @Environment(\.openSettings) private var openSettings
+    #endif
 
     var body: some View {
         Group {
@@ -29,5 +32,14 @@ struct RootView: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        #if DEBUG
+        .task {
+            // Debug hook for UI review: `open -a BookmarkX --args -show-settings`.
+            if ProcessInfo.processInfo.arguments.contains("-show-settings") {
+                try? await Task.sleep(for: .seconds(3))
+                openSettings()
+            }
+        }
+        #endif
     }
 }

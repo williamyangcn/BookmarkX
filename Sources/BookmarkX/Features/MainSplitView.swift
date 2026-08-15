@@ -9,7 +9,7 @@ struct MainSplitView: View {
         NavigationSplitView(columnVisibility: $columnVisibility) {
             HStack(spacing: 0) {
                 ShortcutRailView()
-                    .frame(width: 64)
+                    .frame(width: 68)
                     .frame(maxHeight: .infinity)
 
                 Divider()
@@ -98,45 +98,58 @@ private struct ShortcutRailView: View {
     ]
 
     var body: some View {
-        VStack(spacing: 10) {
+        VStack(spacing: 8) {
             ForEach(shortcuts) { item in
-                Button {
-                    appModel.selectSidebarItem(item)
-                } label: {
-                    Image(systemName: item.systemImage)
-                        .font(.system(size: 16, weight: .semibold))
-                        .foregroundStyle(isSelected(item) ? Color.white : Color.primary.opacity(0.85))
-                        .frame(width: 40, height: 40)
-                        .background(
-                            isSelected(item) ? Color.accentColor : Color.primary.opacity(0.06),
-                            in: RoundedRectangle(cornerRadius: 10, style: .continuous)
-                        )
-                }
-                .buttonStyle(.plain)
-                .help(Text(item.titleKey))
+                railButton(item)
             }
 
             Spacer(minLength: 0)
 
-            Button {
+            railButton(.settings) {
                 openSettings()
-            } label: {
-                Image(systemName: SidebarItem.settings.systemImage)
-                    .font(.system(size: 16, weight: .semibold))
-                    .foregroundStyle(Color.primary.opacity(0.85))
-                    .frame(width: 40, height: 40)
-                    .background(
-                        Color.primary.opacity(0.06),
-                        in: RoundedRectangle(cornerRadius: 10, style: .continuous)
-                    )
             }
-            .buttonStyle(.plain)
-            .help(Text(SidebarItem.settings.titleKey))
         }
         .padding(.vertical, 14)
         .padding(.horizontal, 12)
         .frame(maxHeight: .infinity)
         .background(.ultraThinMaterial)
+    }
+
+    private func railButton(_ item: SidebarItem, action: (() -> Void)? = nil) -> some View {
+        let selected = isSelected(item)
+        return Button {
+            if let action {
+                action()
+            } else {
+                appModel.selectSidebarItem(item)
+            }
+        } label: {
+            Image(systemName: item.systemImage)
+                .font(.system(size: 16, weight: .medium))
+                .foregroundStyle(selected ? Color.white : Color.primary.opacity(0.7))
+                .frame(width: 44, height: 44)
+                .background {
+                    if selected {
+                        RoundedRectangle(cornerRadius: 12, style: .continuous)
+                            .fill(Color.accentColor)
+                            .shadow(color: Color.accentColor.opacity(0.35), radius: 6, y: 2)
+                    }
+                }
+                .overlay(alignment: .topTrailing) {
+                    if item == .inbox, let count = appModel.bookmarkStore?.unreadCount, count > 0 {
+                        Text(count > 99 ? "99+" : "\(count)")
+                            .font(.system(size: 9, weight: .bold))
+                            .foregroundStyle(.white)
+                            .padding(.horizontal, 5)
+                            .padding(.vertical, 1.5)
+                            .background(Capsule().fill(selected ? Color.primary.opacity(0.55) : Color.accentColor))
+                            .offset(x: 4, y: -4)
+                    }
+                }
+        }
+        .buttonStyle(.plain)
+        .help(Text(item.titleKey))
+        .accessibilityLabel(Text(item.titleKey))
     }
 
     private func isSelected(_ item: SidebarItem) -> Bool {
@@ -147,6 +160,8 @@ private struct ShortcutRailView: View {
 private struct MailFolderSidebar: View {
     @Environment(AppModel.self) private var appModel
     @State private var newFolderName = ""
+    @State private var isAddingFolder = false
+    @FocusState private var isNewFolderFieldFocused: Bool
 
     var body: some View {
         let store = appModel.bookmarkStore
@@ -157,7 +172,7 @@ private struct MailFolderSidebar: View {
             set: { appModel.selectSidebarItem($0) }
         )) {
             Section("sidebar.mailboxes") {
-                mailboxRow(.inbox, count: store?.unreadCount ?? 0, color: .orange)
+                mailboxRow(.inbox, count: store?.unreadCount ?? 0, color: .accentColor, prominent: true)
                 mailboxRow(.favorites, count: store?.favoriteCount ?? 0, color: .yellow)
                 mailboxRow(.important, count: store?.importantCount ?? 0, color: .red)
                 mailboxRow(.archive, count: archiveCount, color: .secondary)
@@ -167,34 +182,55 @@ private struct MailFolderSidebar: View {
             Section {
                 ForEach(folders) { folder in
                     HStack(spacing: 10) {
-                        RoundedRectangle(cornerRadius: 4, style: .continuous)
+                        Circle()
                             .fill(Color(hex: folder.colorHex) ?? .accentColor)
-                            .frame(width: 10, height: 10)
+                            .frame(width: 8, height: 8)
                         Text(folder.name)
                             .lineLimit(1)
                         Spacer(minLength: 0)
                         if let count = store?.folderUnreadCounts[folder.id], count > 0 {
-                            UnreadBadge(count: count, color: Color(hex: folder.colorHex) ?? .accentColor)
+                            CountLabel(count: count)
                         }
                     }
+                    .padding(.vertical, 2)
                     .tag(SidebarItem.folder(folder.id))
                 }
-            } header: {
-                Text("sidebar.folders")
-            }
 
-            Section("folders.newSection") {
-                HStack {
-                    TextField("folders.newPlaceholder", text: $newFolderName)
-                        .textFieldStyle(.roundedBorder)
-                    Button {
-                        try? appModel.bookmarkStore?.createFolder(named: newFolderName)
-                        newFolderName = ""
-                        Task { await appModel.reloadBookmarks() }
-                    } label: {
-                        Image(systemName: "plus")
+                if isAddingFolder {
+                    HStack(spacing: 8) {
+                        Image(systemName: "folder.badge.plus")
+                            .foregroundStyle(.secondary)
+                        TextField("folders.newPlaceholder", text: $newFolderName)
+                            .textFieldStyle(.plain)
+                            .focused($isNewFolderFieldFocused)
+                            .onSubmit(createFolder)
+                        Button(action: createFolder) {
+                            Image(systemName: "checkmark.circle.fill")
+                                .foregroundStyle(Color.accentColor)
+                        }
+                        .buttonStyle(.plain)
+                        .disabled(newFolderName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                     }
-                    .disabled(newFolderName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                    .padding(.vertical, 2)
+                }
+            } header: {
+                HStack {
+                    Text("sidebar.folders")
+                    Spacer()
+                    Button {
+                        withAnimation(.easeInOut(duration: 0.15)) {
+                            isAddingFolder.toggle()
+                        }
+                        if isAddingFolder {
+                            isNewFolderFieldFocused = true
+                        }
+                    } label: {
+                        Image(systemName: isAddingFolder ? "xmark" : "plus")
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(.secondary)
+                    }
+                    .buttonStyle(.plain)
+                    .help(Text("folders.create"))
                 }
             }
         }
@@ -202,14 +238,31 @@ private struct MailFolderSidebar: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
-    private func mailboxRow(_ item: SidebarItem, count: Int, color: Color) -> some View {
-        HStack {
-            Label(item.titleKey, systemImage: item.systemImage)
+    private func createFolder() {
+        let name = newFolderName.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !name.isEmpty else { return }
+        try? appModel.bookmarkStore?.createFolder(named: name)
+        newFolderName = ""
+        isAddingFolder = false
+        Task { await appModel.reloadBookmarks() }
+    }
+
+    private func mailboxRow(
+        _ item: SidebarItem,
+        count: Int,
+        color: Color,
+        prominent: Bool = false
+    ) -> some View {
+        HStack(spacing: 10) {
+            Image(systemName: item.systemImage)
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(color)
+                .frame(width: 20)
+            Text(item.titleKey)
             Spacer(minLength: 0)
-            if count > 0 {
-                UnreadBadge(count: count, color: color)
-            }
+            CountLabel(count: count, prominent: prominent)
         }
+        .padding(.vertical, 2)
         .tag(item)
     }
 
@@ -222,16 +275,25 @@ private struct MailFolderSidebar: View {
     }
 }
 
-private struct UnreadBadge: View {
+/// Sidebar counts: a quiet number for totals, an accent pill for unread.
+private struct CountLabel: View {
     let count: Int
-    let color: Color
+    var prominent: Bool = false
 
     var body: some View {
-        Text("\(count)")
-            .font(.caption2.weight(.bold))
-            .foregroundStyle(.white)
-            .padding(.horizontal, 7)
-            .padding(.vertical, 2)
-            .background(color, in: Capsule())
+        if count > 0 {
+            if prominent {
+                Text(count, format: .number)
+                    .font(.caption2.weight(.bold))
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 7)
+                    .padding(.vertical, 2)
+                    .background(Color.accentColor, in: Capsule())
+            } else {
+                Text(count, format: .number)
+                    .font(.subheadline.monospacedDigit())
+                    .foregroundStyle(.secondary)
+            }
+        }
     }
 }

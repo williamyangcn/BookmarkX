@@ -68,7 +68,12 @@ struct BookmarkDetailView: View {
                     detailPillDivider
 
                     Link(destination: postURL) {
-                        Image(systemName: "arrow.up.right.square")
+                        Image("XLogo")
+                            .renderingMode(.template)
+                            .resizable()
+                            .scaledToFit()
+                            .frame(width: 12, height: 12)
+                            .foregroundStyle(Color.primary.opacity(0.85))
                             .frame(width: 30, height: 28)
                     }
                     .help(Text("detail.openOnX"))
@@ -77,7 +82,11 @@ struct BookmarkDetailView: View {
                 .padding(.horizontal, 4)
                 .background(
                     Capsule(style: .continuous)
-                        .fill(Color.primary.opacity(0.06))
+                        .fill(Color.primary.opacity(0.05))
+                )
+                .overlay(
+                    Capsule(style: .continuous)
+                        .strokeBorder(Color.primary.opacity(0.06), lineWidth: 1)
                 )
             }
 
@@ -200,12 +209,17 @@ struct BookmarkDetailView: View {
             }
         }
         .frame(width: 36, height: 36)
-        .clipShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
+        .clipShape(Circle())
+        .overlay(Circle().strokeBorder(Color.primary.opacity(0.06), lineWidth: 1))
     }
 
     private var avatarFallback: some View {
         ZStack {
-            Color.accentColor.opacity(0.18)
+            LinearGradient(
+                colors: [Color.accentColor.opacity(0.28), Color.accentColor.opacity(0.12)],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
             Text(String(item.authorName.prefix(1)).uppercased())
                 .font(.headline)
                 .foregroundStyle(Color.accentColor)

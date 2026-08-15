@@ -20,7 +20,7 @@ Local-first macOS app for X (Twitter) bookmarks — sync, organize, search, and 
   </a>
 </p>
 
-**Latest:** [v0.2.4](https://github.com/williamyangcn/BookmarkX/releases/tag/v0.2.4) · [Download `BookmarkX-0.2.4.dmg`](https://github.com/williamyangcn/BookmarkX/releases/latest)
+**Latest:** [v0.2.5](https://github.com/williamyangcn/BookmarkX/releases/tag/v0.2.5) · [Download `BookmarkX-0.2.5.dmg`](https://github.com/williamyangcn/BookmarkX/releases/latest)
 
 ### Screenshots / 截图
 
@@ -42,12 +42,19 @@ Local-first macOS app for X (Twitter) bookmarks — sync, organize, search, and 
 
 | Package | Link |
 | --- | --- |
-| **v0.2.4 DMG** | [Download `BookmarkX-0.2.4.dmg`](https://github.com/williamyangcn/BookmarkX/releases/latest) |
+| **v0.2.5 DMG** | [Download `BookmarkX-0.2.5.dmg`](https://github.com/williamyangcn/BookmarkX/releases/latest) |
 | All versions | [Releases page](https://github.com/williamyangcn/BookmarkX/releases) |
 
 1. Open the `.dmg` and drag **BookmarkX** into **Applications**.
 2. On first launch, macOS may ask you to allow an unsigned/ad-hoc build: **System Settings → Privacy & Security → Open Anyway**.
 3. Sign in with X inside the app, then click **Refresh** to sync bookmarks.
+
+### What’s new in 0.2.5
+
+- Mail-style sidebar (compact rail, unread badges, folder color dots) and a split Settings window
+- Bookmark list: search, segmented filters, unread dots, circular avatars
+- New app icon: swallowtail bookmark close-up in X’s black-and-white mark
+- Default sign-in stays in-app web login (no Developer Client ID required)
 
 ### What’s new in 0.2.4
 
@@ -118,7 +125,7 @@ xcodebuild -scheme BookmarkX -destination 'platform=macOS' test
 ```bash
 export DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer
 ./Scripts/package-dmg.sh          # → dist/BookmarkX-<version>.dmg
-./Scripts/package-dmg.sh 0.2.4    # optional version tag
+./Scripts/package-dmg.sh 0.2.5    # optional version tag
 ```
 
 Upload the DMG on [GitHub Releases](https://github.com/williamyangcn/BookmarkX/releases/new) so the Download badge above points at a real file.
@@ -148,12 +155,19 @@ Upload the DMG on [GitHub Releases](https://github.com/williamyangcn/BookmarkX/r
 
 | 安装包 | 链接 |
 | --- | --- |
-| **v0.2.4 DMG** | [下载 `BookmarkX-0.2.4.dmg`](https://github.com/williamyangcn/BookmarkX/releases/latest) |
+| **v0.2.5 DMG** | [下载 `BookmarkX-0.2.5.dmg`](https://github.com/williamyangcn/BookmarkX/releases/latest) |
 | 历史版本 | [Releases 页面](https://github.com/williamyangcn/BookmarkX/releases) |
 
 1. 打开 `.dmg`，把 **BookmarkX** 拖进 **应用程序**。
 2. 首次打开若被拦截：系统设置 → 隐私与安全性 → 仍要打开（当前为 ad-hoc 签名）。
 3. 在应用内用 X 登录，然后点 **刷新** 同步书签。
+
+### 0.2.5 更新
+
+- Mail 风格侧栏（紧凑轨道、未读角标、文件夹色点）和分栏设置窗口
+- 书签列表：搜索、分段筛选、未读圆点、圆形头像
+- 新图标：书签燕尾特写 + X 标志造型
+- 默认登录仍是应用内网页登录（无需 Developer Client ID）
 
 ### 0.2.4 更新
 
@@ -224,7 +238,7 @@ xcodebuild -scheme BookmarkX -destination 'platform=macOS' test
 ```bash
 export DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer
 ./Scripts/package-dmg.sh          # 输出 dist/BookmarkX-<version>.dmg
-./Scripts/package-dmg.sh 0.2.4    # 可指定版本号
+./Scripts/package-dmg.sh 0.2.5    # 可指定版本号
 ```
 
 把生成的 DMG 上传到 [GitHub Releases](https://github.com/williamyangcn/BookmarkX/releases/new)，上方下载按钮即可指向真实安装包。

@@ -49,7 +49,7 @@ struct BookmarkListView: View {
                         set: { appModel.selectBookmark($0) }
                     )) {
                         ForEach(groupedItems(items)) { section in
-                            Section(section.title) {
+                            Section {
                                 ForEach(section.items) { item in
                                     BookmarkRowView(
                                         item: item,
@@ -60,6 +60,11 @@ struct BookmarkListView: View {
                                         bookmarkContextMenu(for: item)
                                     }
                                 }
+                            } header: {
+                                Text(section.title)
+                                    .font(.caption.weight(.semibold))
+                                    .foregroundStyle(.secondary)
+                                    .textCase(.uppercase)
                             }
                         }
                     }
@@ -97,10 +102,27 @@ struct BookmarkListView: View {
         }
     }
 
-    /// Column-3 top chrome: refresh + search + filter, then selection actions.
+    /// Column-2 chrome: title + refresh, search, then filter + selection actions.
     private var columnChrome: some View {
-        VStack(spacing: 10) {
-            HStack(spacing: 10) {
+        VStack(spacing: 12) {
+            HStack(alignment: .firstTextBaseline, spacing: 10) {
+                Text(listTitle)
+                    .font(.title2.weight(.bold))
+                    .lineLimit(1)
+
+                if let status = statusLine {
+                    Text(status)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                } else {
+                    Text("bookmarks.count \(displayedItems.count)")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+
+                Spacer(minLength: 8)
+
                 Button {
                     Task { await appModel.refreshBookmarks() }
                 } label: {
@@ -113,63 +135,39 @@ struct BookmarkListView: View {
                         }
                     }
                     .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(Color.primary.opacity(0.75))
                     .frame(width: 28, height: 28)
                 }
                 .buttonStyle(.plain)
                 .disabled(appModel.isSyncing || appModel.isEnriching)
                 .help("action.refresh.help")
                 .background(Circle().fill(Color.primary.opacity(0.06)))
-
-                searchField
-
-                if showsUnreadStyle {
-                    Menu {
-                        ForEach(ListFilterTab.allCases) { tab in
-                            Button {
-                                filterTab = tab
-                            } label: {
-                                HStack {
-                                    filterLabel(tab)
-                                    if filterTab == tab {
-                                        Image(systemName: "checkmark")
-                                    }
-                                }
-                            }
-                        }
-                    } label: {
-                        Image(systemName: "line.3.horizontal.decrease")
-                            .font(.system(size: 13, weight: .semibold))
-                            .frame(width: 28, height: 28)
-                    }
-                    .menuStyle(.borderlessButton)
-                    .help(Text("bookmarks.filter.menu"))
-                    .background(Circle().fill(Color.primary.opacity(0.06)))
-                }
             }
+
+            searchField
 
             HStack(spacing: 12) {
-                selectionActionBar
-                Spacer(minLength: 8)
-                VStack(alignment: .trailing, spacing: 2) {
-                    Text(listTitle)
-                        .font(.subheadline.weight(.semibold))
-                        .lineLimit(1)
-                    if let status = statusLine {
-                        Text(status)
-                            .font(.caption2)
-                            .foregroundStyle(.secondary)
-                            .lineLimit(1)
-                    } else {
-                        Text("bookmarks.count \(displayedItems.count)")
-                            .font(.caption2)
-                            .foregroundStyle(.secondary)
+                if showsUnreadStyle {
+                    Picker(selection: $filterTab) {
+                        ForEach(ListFilterTab.allCases) { tab in
+                            Text(tab.titleKey).tag(tab)
+                        }
+                    } label: {
+                        EmptyView()
                     }
+                    .pickerStyle(.segmented)
+                    .labelsHidden()
+                    .frame(maxWidth: 220)
                 }
+
+                Spacer(minLength: 8)
+
+                selectionActionBar
             }
         }
-        .padding(.horizontal, 12)
-        .padding(.top, 10)
-        .padding(.bottom, 10)
+        .padding(.horizontal, 14)
+        .padding(.top, 14)
+        .padding(.bottom, 12)
         .background(.bar)
     }
 
@@ -205,7 +203,10 @@ struct BookmarkListView: View {
         )
         .overlay(
             RoundedRectangle(cornerRadius: 10, style: .continuous)
-                .strokeBorder(Color.primary.opacity(0.08), lineWidth: 1)
+                .strokeBorder(
+                    isSearchFocused ? Color.accentColor.opacity(0.5) : Color.primary.opacity(0.08),
+                    lineWidth: 1
+                )
         )
     }
 
@@ -247,8 +248,8 @@ struct BookmarkListView: View {
                     .disabled(selected == nil)
                 }
             } label: {
-                Image(systemName: selected?.importance == .high ? "exclamationmark.circle.fill" : "exclamationmark.circle")
-                    .font(.system(size: 13, weight: .medium))
+                Image(systemName: selected?.importance == .high ? "flag.fill" : "flag")
+                    .font(.system(size: 12, weight: .medium))
                     .foregroundStyle(selected?.importance == .high ? Color.red : Color.primary.opacity(selected == nil ? 0.35 : 0.85))
                     .frame(width: 30, height: 28)
             }
@@ -296,7 +297,11 @@ struct BookmarkListView: View {
         .padding(.horizontal, 4)
         .background(
             Capsule(style: .continuous)
-                .fill(Color.primary.opacity(0.06))
+                .fill(Color.primary.opacity(0.05))
+        )
+        .overlay(
+            Capsule(style: .continuous)
+                .strokeBorder(Color.primary.opacity(0.06), lineWidth: 1)
         )
     }
 
@@ -333,18 +338,6 @@ struct BookmarkListView: View {
     private var selectedItem: BookmarkListItem? {
         guard let id = appModel.selectedBookmarkID else { return nil }
         return appModel.bookmarkStore?.items.first(where: { $0.id == id })
-    }
-
-    @ViewBuilder
-    private func filterLabel(_ tab: ListFilterTab) -> some View {
-        switch tab {
-        case .all:
-            Text("bookmarks.filter.all")
-        case .unread:
-            Text("bookmarks.filter.unreadFormat \(appModel.filteredBookmarks.filter { !$0.isRead }.count)")
-        case .others:
-            Text("bookmarks.filter.othersFormat \(appModel.filteredBookmarks.filter(\.isRead).count)")
-        }
     }
 
     private var statusLine: String? {
@@ -495,31 +488,32 @@ private struct BookmarkRowView: View {
     }
 
     var body: some View {
-        HStack(alignment: .top, spacing: 12) {
+        HStack(alignment: .top, spacing: 10) {
+            unreadDot
             authorAvatar
 
-            VStack(alignment: .leading, spacing: 5) {
-                HStack(alignment: .firstTextBaseline, spacing: 8) {
+            VStack(alignment: .leading, spacing: 3) {
+                HStack(alignment: .firstTextBaseline, spacing: 6) {
                     Text(item.authorName)
                         .font(.subheadline.weight(appearsUnread ? .bold : .medium))
                         .lineLimit(1)
                     Text("@\(item.authorUsername)")
-                        .font(.caption.weight(.semibold))
+                        .font(.caption)
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
-                    Spacer(minLength: 8)
+                    Spacer(minLength: 6)
                     importanceGlyph
                     Text(AppLocalization.relativeDate(item.postedAt))
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
+                        .font(.caption2.weight(appearsUnread ? .semibold : .regular))
+                        .foregroundStyle(appearsUnread ? Color.accentColor : Color.secondary)
                 }
 
                 Text(displayTitle)
-                    .font(.body.weight(appearsUnread ? .semibold : .regular))
+                    .font(.callout.weight(appearsUnread ? .semibold : .regular))
                     .lineLimit(1)
 
                 Text(snippet)
-                    .font(.subheadline)
+                    .font(.caption)
                     .foregroundStyle(.secondary)
                     .lineLimit(2)
 
@@ -532,6 +526,7 @@ private struct BookmarkRowView: View {
                     if let category = item.category, !category.isEmpty {
                         Text(category)
                             .font(.caption2)
+                            .foregroundStyle(.secondary)
                             .padding(.horizontal, 6)
                             .padding(.vertical, 2)
                             .background(.quaternary, in: Capsule())
@@ -543,27 +538,40 @@ private struct BookmarkRowView: View {
                     }
                     Spacer()
                 }
+                .padding(.top, 2)
             }
         }
-        .padding(.vertical, 4)
-        .opacity(appearsUnread ? 1 : 0.88)
+        .padding(.vertical, 6)
+    }
+
+    /// Leading accent dot, mail-style. Keeps a fixed gutter so rows stay aligned.
+    private var unreadDot: some View {
+        Circle()
+            .fill(appearsUnread ? Color.accentColor : Color.clear)
+            .frame(width: 7, height: 7)
+            .padding(.top, 5)
     }
 
     private var authorAvatar: some View {
         CachedAsyncImage(
             url: item.authorProfileImageURL.flatMap(URL.init(string:)),
-            width: 40,
-            height: 40,
+            width: 36,
+            height: 36,
             fallback: { AnyView(avatarFallback) }
         )
-        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .clipShape(Circle())
+        .overlay(Circle().strokeBorder(Color.primary.opacity(0.06), lineWidth: 1))
     }
 
     private var avatarFallback: some View {
         ZStack {
-            Color.accentColor.opacity(0.18)
+            LinearGradient(
+                colors: [Color.accentColor.opacity(0.28), Color.accentColor.opacity(0.12)],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
             Text(String(item.authorName.prefix(1)).uppercased())
-                .font(.headline.weight(.bold))
+                .font(.subheadline.weight(.bold))
                 .foregroundStyle(Color.accentColor)
         }
     }
@@ -572,8 +580,8 @@ private struct BookmarkRowView: View {
     private var importanceGlyph: some View {
         switch item.importance {
         case .high:
-            Image(systemName: "exclamationmark.circle.fill")
-                .font(.caption)
+            Image(systemName: "flag.fill")
+                .font(.caption2)
                 .foregroundStyle(.red)
                 .help(Text("importance.high"))
         case .low:
